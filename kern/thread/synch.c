@@ -165,7 +165,7 @@ lock_create(const char *name)
         
         // add stuff here as needed
         lock->lock_wchan = wchan_create(lock->lk_name);
-        if (sem->sem_wchan == NULL) {
+        if (lock->lock_wchan == NULL) {
             kfree(lock->lk_name);
             kfree(lock);
             return NULL;
@@ -189,8 +189,8 @@ lock_destroy(struct lock *lock)
     spinlock_cleanup(&lock->lock_spin);
     wchan_destroy(lock->lock_wchan);
         kfree(lock->lk_name);
-        kfree(lock->lock_owner);
-        kfree(lock->lock_held);
+        // Not free lock->lock_owner and lock->lock_held for now
+	// due to compile error: lock_held is not a pointer
         kfree(lock);
     
 }
@@ -232,9 +232,9 @@ lock_release(struct lock *lock)
 
         lock->lock_held = false;
         lock->lock_owner = NULL;
-        wchan_wakeone(lock->lock_wchan)
+        wchan_wakeone(lock->lock_wchan);
 
-    spinlock_release(&lock->lock_spim);
+    spinlock_release(&lock->lock_spin);
 
 }
 

@@ -78,7 +78,7 @@ struct lock {
         // (don't forget to mark things volatile as needed)
         struct wchan *lock_wchan;
         struct spinlock lock_spin;
-        volatile struct thread lock_owner;
+        volatile struct thread *lock_owner;
         volatile bool lock_held;
 };
 
