@@ -164,6 +164,16 @@ lock_create(const char *name)
         }
         
         // add stuff here as needed
+        lock->lock_wchan = wchan_create(lock->lk_name);
+        if (sem->sem_wchan == NULL) {
+            kfree(lock->lk_name);
+            kfree(lock);
+            return NULL;
+        }
+
+        spinlock_init(&lock->lock_spin);
+        lock->lock_owner = NULL;
+        lock->lock_held = false;
         
         return lock;
 }
@@ -173,36 +183,66 @@ lock_destroy(struct lock *lock)
 {
         KASSERT(lock != NULL);
 
-        // add stuff here as needed
-        
+    // add stuff here as needed
+
+    /* wchan_cleanup will assert if anyone's waiting on it ?*/
+    spinlock_cleanup(&lock->lock_spin);
+    wchan_destroy(lock->lock_wchan);
         kfree(lock->lk_name);
+        kfree(lock->lock_owner);
+        kfree(lock->lock_held);
         kfree(lock);
+    
 }
 
 void
 lock_acquire(struct lock *lock)
 {
-        // Write this
+        //(void)lock;  // suppress warning until code gets written
 
-        (void)lock;  // suppress warning until code gets written
+        KASSERT(lock != NULL);
+        KASSERT(lock_do_i_hold(lock) == false);
+
+    spinlock_acquire(&lock->lock_spin);
+        while (lock->lock_held) {
+            // Must lock the wait channel inside the spinlock. Avoid the thread holding the lock
+            // release the lock between wchan_lock and wchan_sleep. Can potentially cause the 
+            // thread sleeping forever.
+            wchan_lock(lock->lock_wchan);
+        spinlock_release(&lock->lock_spin);
+            // Must sleep outside the spinlock, so that this thread
+            // can be blocked, and other threads can get the spinlock.
+            wchan_sleep(lock->lock_wchan);
+
+        spinlock_acquire(&lock->lock_spin);
+        }
+        lock->lock_held = true;
+        lock->lock_owner = curthread;
+    spinlock_release(&lock->lock_spin);
 }
 
 void
 lock_release(struct lock *lock)
 {
-        // Write this
+        //(void)lock;  // suppress warning until code gets written
+        // Must own the lock
+        KASSERT(lock_do_i_hold(lock));
 
-        (void)lock;  // suppress warning until code gets written
+    spinlock_acquire(&lock->lock_spin);
+
+        lock->lock_held = false;
+        lock->lock_owner = NULL;
+        wchan_wakeone(lock->lock_wchan)
+
+    spinlock_release(&lock->lock_spim);
+
 }
 
 bool
 lock_do_i_hold(struct lock *lock)
 {
-        // Write this
-
-        (void)lock;  // suppress warning until code gets written
-
-        return true; // dummy until code gets written
+        //(void)lock;  // suppress warning until code gets written
+        return lock->lock_owner == curthread;
 }
 
 ////////////////////////////////////////////////////////////
