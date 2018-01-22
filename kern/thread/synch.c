@@ -303,11 +303,13 @@ cv_wait(struct cv *cv, struct lock *lock)
 void
 cv_signal(struct cv *cv, struct lock *lock)
 {
+    (void)lock;
     wchan_wakeone(cv->cv_wchan);
 }
 
 void
 cv_broadcast(struct cv *cv, struct lock *lock)
 {
+    (void)lock;
     wchan_wakeall(cv->cv_wchan);
 }
