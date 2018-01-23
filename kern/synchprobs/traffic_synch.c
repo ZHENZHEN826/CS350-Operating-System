@@ -40,7 +40,7 @@ typedef struct cars {
 
 volatile car carInIntersection[MAX_THREADS];
 volatile int carNumber = 0;
-determineTurn(Direction origin, Direction destination){
+static int determineTurn(Direction origin, Direction destination){
   if (((origin == west) && (destination == south)) ||
       ((origin == south) && (destination == east)) ||
       ((origin == east) && (destination == north)) ||
@@ -58,16 +58,17 @@ determineTurn(Direction origin, Direction destination){
     return left;
   } else {
     panic("car turn not exist");
+    return -1;
   }
 }
 
 static struct semaphore *intersectionSem;
 
 static struct lock *intersectionLock;
-static struct cv *canGoNorth;
-static struct cv *canGoSouth;
-static struct cv *canGoWest;
-static struct cv *canGoEast;
+//static struct cv *canGoNorth;
+//static struct cv *canGoSouth;
+//static struct cv *canGoWest;
+//static struct cv *canGoEast;
 static struct cv *emptyIntersection;
 /* 
  * The simulation driver will call this function once before starting
@@ -86,7 +87,7 @@ intersection_sync_init(void)
     panic("could not create intersection semaphore");
   }
 
-  intersectionLock = lock_create(intersectionLock);
+  intersectionLock = lock_create("intersectionLock");
   return;
 }
 
@@ -149,7 +150,7 @@ intersection_before_entry(Direction origin, Direction destination)
         carInIntersection [carNumber] = oneCar;
         carNumber += 1;
       } else{
-        while{carNumber > 0} {
+        while(carNumber > 0) {
           cv_wait(emptyIntersection,intersectionLock);
         }
       }
@@ -180,10 +181,10 @@ intersection_after_exit(Direction origin, Direction destination)
   KASSERT(intersectionLock != NULL);
   lock_acquire(intersectionLock);
     for(int i = 0; i < carNumber; i++){
-      if (carInIntersection[i].origin == origin) && (carInIntersection[i].destination == destination){
+      if ((carInIntersection[i].origin == origin) && (carInIntersection[i].destination == destination)){
         // delete the car
-        carInIntersection[i] = array[--carNumber];
-        carnumber --;
+        carInIntersection[i] = carInIntersection[--carNumber];
+        carNumber --;
         break;
       }
     }
