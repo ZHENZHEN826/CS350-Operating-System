@@ -21,9 +21,54 @@
 /*
  * replace this with declarations of any synchronization and other variables you need here
  */
+
+#define MAX_THREADS 100
+
+enum Turns
+  { 
+    straight = 0,
+    left = 1,
+    right = 2,
+  };
+typedef enum Turns Turn;
+
+typedef struct cars {
+  Direction origin;
+  Direction destination;
+  Turn carTurn;
+}car;
+
+volatile car carInIntersection[MAX_THREADS];
+volatile int carNumber = 0;
+determineTurn(Direction origin, Direction destination){
+  if (((origin == west) && (destination == south)) ||
+      ((origin == south) && (destination == east)) ||
+      ((origin == east) && (destination == north)) ||
+      ((origin == north) && (destination == west))) {
+    return right;
+  } else if (((origin == north) && (destination == south)) ||
+      ((origin == south) && (destination == north)) ||
+      ((origin == east) && (destination == west)) ||
+      ((origin == west) && (destination == east))){
+    return straight;
+  } else if (((origin == south) && (destination == west)) ||
+      ((origin == west) && (destination == north)) ||
+      ((origin == north) && (destination == east)) ||
+      ((origin == east) && (destination == south))) {
+    return left;
+  } else {
+    panic("car turn not exist");
+  }
+}
+
 static struct semaphore *intersectionSem;
 
-
+static struct lock *intersectionLock;
+static struct cv *canGoNorth;
+static struct cv *canGoSouth;
+static struct cv *canGoWest;
+static struct cv *canGoEast;
+static struct cv *emptyIntersection;
 /* 
  * The simulation driver will call this function once before starting
  * the simulation
@@ -40,6 +85,8 @@ intersection_sync_init(void)
   if (intersectionSem == NULL) {
     panic("could not create intersection semaphore");
   }
+
+  intersectionLock = lock_create(intersectionLock);
   return;
 }
 
@@ -56,6 +103,8 @@ intersection_sync_cleanup(void)
   /* replace this default implementation with your own implementation */
   KASSERT(intersectionSem != NULL);
   sem_destroy(intersectionSem);
+
+  lock_destroy(intersectionLock);
 }
 
 
@@ -76,10 +125,36 @@ void
 intersection_before_entry(Direction origin, Direction destination) 
 {
   /* replace this default implementation with your own implementation */
-  (void)origin;  /* avoid compiler complaint about unused parameter */
-  (void)destination; /* avoid compiler complaint about unused parameter */
-  KASSERT(intersectionSem != NULL);
-  P(intersectionSem);
+  //(void)origin;  /* avoid compiler complaint about unused parameter */
+  //(void)destination; /* avoid compiler complaint about unused parameter */
+  //KASSERT(intersectionSem != NULL);
+  //P(intersectionSem);
+
+  KASSERT(intersectionLock != NULL);
+  lock_acquire(intersectionLock);
+    // number of car in intersection
+    if (carNumber == 0){
+      // No car in the intersection, add the car to the array
+      car oneCar = {origin, destination, determineTurn(origin, destination)};
+      carInIntersection [carNumber] = oneCar;
+      carNumber += 1;
+    }
+    if (carNumber == 1){
+      if (carInIntersection[0].origin == origin){
+        car oneCar = {origin, destination, determineTurn(origin, destination)};
+        carInIntersection [carNumber] = oneCar;
+        carNumber += 1;
+      } else if ((carInIntersection[0].origin == destination) && (carInIntersection[0].destination == origin)) {
+        car oneCar = {origin, destination, determineTurn(origin, destination)};
+        carInIntersection [carNumber] = oneCar;
+        carNumber += 1;
+      } else{
+        while{carNumber > 0} {
+          cv_wait(emptyIntersection,intersectionLock);
+        }
+      }
+    }
+  lock_release(intersectionLock);
 }
 
 
@@ -98,8 +173,22 @@ void
 intersection_after_exit(Direction origin, Direction destination) 
 {
   /* replace this default implementation with your own implementation */
-  (void)origin;  /* avoid compiler complaint about unused parameter */
-  (void)destination; /* avoid compiler complaint about unused parameter */
-  KASSERT(intersectionSem != NULL);
-  V(intersectionSem);
+  //(void)origin;  /* avoid compiler complaint about unused parameter */
+  //(void)destination; /* avoid compiler complaint about unused parameter */
+  //KASSERT(intersectionSem != NULL);
+  //V(intersectionSem);
+  KASSERT(intersectionLock != NULL);
+  lock_acquire(intersectionLock);
+    for(int i = 0; i < carNumber; i++){
+      if (carInIntersection[i].origin == origin) && (carInIntersection[i].destination == destination){
+        // delete the car
+        carInIntersection[i] = array[--carNumber];
+        carnumber --;
+        break;
+      }
+    }
+    if (carNumber == 0){
+      cv_signal(emptyIntersection, intersectionLock);
+    }
+  lock_release(intersectionLock);
 }
