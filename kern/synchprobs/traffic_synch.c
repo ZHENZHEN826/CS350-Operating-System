@@ -2,6 +2,7 @@
 #include <lib.h>
 #include <synchprobs.h>
 #include <synch.h>
+#include <array.h>
 #include <opt-A1.h>
 
 /* 
@@ -22,7 +23,7 @@
  * replace this with declarations of any synchronization and other variables you need here
  */
 
-#define MAX_THREADS 100
+#define MAX_CARS 100
 
 enum Turns
   { 
@@ -38,9 +39,14 @@ typedef struct cars {
   Turn carTurn;
 }car;
 
-volatile car carInIntersection[MAX_THREADS];
-volatile int carNumber = 0;
-static int determineTurn(Direction origin, Direction destination){
+struct array *carOrigin = array_create();
+struct array *carDestination = array_create();
+array_init(carOrigin);
+array_init(carDestination);
+
+unsigned *carNumber = 0;
+int determineTurn(Direction origin, Direction destination);
+int determineTurn(Direction origin, Direction destination){
   if (((origin == west) && (destination == south)) ||
       ((origin == south) && (destination == east)) ||
       ((origin == east) && (destination == north)) ||
@@ -62,14 +68,14 @@ static int determineTurn(Direction origin, Direction destination){
   }
 }
 
-static struct semaphore *intersectionSem;
+//static struct semaphore *intersectionSem;
 
-static struct lock *intersectionLock;
+ struct lock *intersectionLock;
 //static struct cv *canGoNorth;
 //static struct cv *canGoSouth;
 //static struct cv *canGoWest;
 //static struct cv *canGoEast;
-static struct cv *emptyIntersection;
+struct cv *emptyIntersection;
 /* 
  * The simulation driver will call this function once before starting
  * the simulation
@@ -82,10 +88,10 @@ intersection_sync_init(void)
 {
   /* replace this default implementation with your own implementation */
 
-  intersectionSem = sem_create("intersectionSem",1);
-  if (intersectionSem == NULL) {
-    panic("could not create intersection semaphore");
-  }
+  //intersectionSem = sem_create("intersectionSem",1);
+  //if (intersectionSem == NULL) {
+  //  panic("could not create intersection semaphore");
+  //}
 
   intersectionLock = lock_create("intersectionLock");
   return;
@@ -102,8 +108,8 @@ void
 intersection_sync_cleanup(void)
 {
   /* replace this default implementation with your own implementation */
-  KASSERT(intersectionSem != NULL);
-  sem_destroy(intersectionSem);
+  //KASSERT(intersectionSem != NULL);
+  //sem_destroy(intersectionSem);
 
   lock_destroy(intersectionLock);
 }
@@ -137,23 +143,31 @@ intersection_before_entry(Direction origin, Direction destination)
     if (carNumber == 0){
       // No car in the intersection, add the car to the array
       car oneCar = {origin, destination, determineTurn(origin, destination)};
-      carInIntersection [carNumber] = oneCar;
-      carNumber += 1;
-    }
-    if (carNumber == 1){
+      //array_add(carInIntersection, oneCar, carNumber);
+      array_add(carOrigin,&origin, &carNumber);
+      array_add(carDestination, &destination, &carNumber);
+      carNumber = carNumber + 1;
+    } else if (carNumber == 1){
       if (carInIntersection[0].origin == origin){
         car oneCar = {origin, destination, determineTurn(origin, destination)};
-        carInIntersection [carNumber] = oneCar;
-        carNumber += 1;
+        //array_add(carInIntersection, oneCar, carNumber);
+        array_add(carOrigin,&origin, &carNumber);
+        array_add(carDestination, &destination, &carNumber);
+        carNumber = carNumber + 1;
       } else if ((carInIntersection[0].origin == destination) && (carInIntersection[0].destination == origin)) {
         car oneCar = {origin, destination, determineTurn(origin, destination)};
-        carInIntersection [carNumber] = oneCar;
-        carNumber += 1;
+        //array_add(carInIntersection, oneCar, carNumber);
+        array_add(carOrigin,&origin, &carNumber);
+        array_add(carDestination, &destination, &carNumber);
+        carNumber = carNumber + 1;
       } else{
         while(carNumber > 0) {
           cv_wait(emptyIntersection,intersectionLock);
         }
       }
+    }
+    while (carNumber > 1){
+      cv_wait(emptyIntersection, intersectionLock);
     }
   lock_release(intersectionLock);
 }
@@ -183,7 +197,8 @@ intersection_after_exit(Direction origin, Direction destination)
     for(int i = 0; i < carNumber; i++){
       if ((carInIntersection[i].origin == origin) && (carInIntersection[i].destination == destination)){
         // delete the car
-        carInIntersection[i] = carInIntersection[--carNumber];
+        array_remove(carOrigin, i);
+	array_remove(carDestination, i);
         carNumber --;
         break;
       }
