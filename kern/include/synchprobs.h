@@ -17,9 +17,9 @@ enum Turns
     left = 1,
     right = 2,
   };
-
+typedef enum Turns Turn;
 /* student-implemented functions for the road intersection problem */
-Turns determineTurn(Direction origin, Direction destination);
+Turn determineTurn(Direction origin, Direction destination);
 
 void intersection_sync_init(void);
 void intersection_sync_cleanup(void);
