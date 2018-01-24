@@ -11,7 +11,15 @@ enum Directions
   };
 typedef enum Directions Direction;
 
+enum Turns 
+ { 
+    straight = 0,
+    left = 1,
+    right = 2,
+  };
+
 /* student-implemented functions for the road intersection problem */
+Turns determineTurn(Direction origin, Direction destination);
 
 void intersection_sync_init(void);
 void intersection_sync_cleanup(void);
