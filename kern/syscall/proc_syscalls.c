@@ -102,23 +102,26 @@ sys_fork(pid_t pid,
     /* Create process structure for child process */
     struct proc *childProc = proc_create_runprogram("childProc");
     if (childProc == NULL) {
-        return NULL;
+        return -1;
     }
     /* Create and copy address space */
     struct addrspace *oldas = curproc->p_addrspace;
     struct addrspace *newas;
+    DEBUG(DB_LOCORE,"Fork110: oldas(%d) newas(%d)\n",sizeof(oldas),sizeof(newas));
     // as_copy: creates a new address spaces, and copies 
     // the pages from the old address space to the new one
-    int as_copy_status = as_copy(oldas, newas);
+    int as_copy_status = as_copy(oldas, &newas);
     // if as_copy return an error
     if (as_copy_status > 0){
         return as_copy_status;
     }
+    DEBUG(DB_LOCORE,"Fork118: oldas(%d) newas(%d)\n",sizeof(oldas),sizeof(newas));
     // associate address space with the child process
     spinlock_acquire(&childProc->p_lock);
     childProc->p_addrspace = newas;
     spinlock_release(&childProc->p_lock);
+    DEBUG(DB_LOCORE,"Fork123: childas(%d)\n",sizeof(childProc->p_addrspace));
 
-
+    return (0);
 }
 

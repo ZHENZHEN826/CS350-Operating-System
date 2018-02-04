@@ -1,0 +1,5 @@
+kern/compile/
+build/
+defs.mk
+user/**/.depend
+user/**/build
