@@ -129,6 +129,15 @@ syscall(struct trapframe *tf)
 			    (int)tf->tf_a2,
 			    (pid_t *)&retval);
 	  break;
+#if OPT_A2
+	case SYS_fork:
+	  err = sys_waitpid((pid_t)tf->tf_a0,
+			    (userptr_t)tf->tf_a1,
+			    (int)tf->tf_a2,
+			    (pid_t *)&retval);
+	  break;
+#endif
+
 #endif // UW
 
 	    /* Add stuff here */

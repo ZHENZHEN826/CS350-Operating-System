@@ -92,3 +92,33 @@ sys_waitpid(pid_t pid,
   return(0);
 }
 
+int
+sys_fork(pid_t pid,
+      userptr_t status,
+      int options,
+      pid_t *retval)
+{ 
+    (void)pid;(void)status;(void)options;(void)retval;
+    /* Create process structure for child process */
+    struct proc *childProc = proc_create_runprogram("childProc");
+    if (childProc == NULL) {
+        return NULL;
+    }
+    /* Create and copy address space */
+    struct addrspace *oldas = curproc->p_addrspace;
+    struct addrspace *newas;
+    // as_copy: creates a new address spaces, and copies 
+    // the pages from the old address space to the new one
+    int as_copy_status = as_copy(oldas, newas);
+    // if as_copy return an error
+    if (as_copy_status > 0){
+        return as_copy_status;
+    }
+    // associate address space with the child process
+    spinlock_acquire(&childProc->p_lock);
+    childProc->p_addrspace = newas;
+    spinlock_release(&childProc->p_lock);
+
+
+}
+
