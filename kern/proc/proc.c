@@ -103,6 +103,10 @@ proc_create(const char *name)
 	proc->console = NULL;
 #endif // UW
 
+#if OPT_A2
+	proc->pid = pidCount;
+	proc->parent = 0;
+#endif
 	return proc;
 }
 
@@ -167,7 +171,11 @@ proc_destroy(struct proc *proc)
 	spinlock_cleanup(&proc->p_lock);
 
 	kfree(proc->p_name);
+#if OPT_A2
+	kfree(proc->pid);
+	kfree(proc->parent)
 	kfree(proc);
+#endif
 
 #ifdef UW
 	/* decrement the process count */
@@ -199,6 +207,7 @@ proc_bootstrap(void)
   }
 #ifdef UW
   proc_count = 0;
+  pid_count = 0;
   proc_count_mutex = sem_create("proc_count_mutex",1);
   if (proc_count_mutex == NULL) {
     panic("could not create proc_count_mutex semaphore\n");

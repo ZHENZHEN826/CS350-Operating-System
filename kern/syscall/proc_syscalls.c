@@ -53,10 +53,18 @@ void sys__exit(int exitcode) {
 int
 sys_getpid(pid_t *retval)
 {
+#if OPT_A2
+  // TO DO:
+  // Need to perform process assignment even without/before any fork calls.
+  //   The first user process might call getpid before creating any children. 
+  //   sys_getpid needs to return a valid PID for this process.
+  return kproc->pid;
+#else
   /* for now, this is just a stub that always returns a PID of 1 */
   /* you need to fix this to make it work properly */
   *retval = 1;
   return(0);
+#endif 
 }
 
 /* stub handler for waitpid() system call                */
@@ -92,13 +100,12 @@ sys_waitpid(pid_t pid,
   return(0);
 }
 
+#if OPT_A2
+struct lock *pidCountLock = lock_create("pidCount");
+
 int
-sys_fork(pid_t pid,
-      userptr_t status,
-      int options,
-      pid_t *retval)
-{ 
-    (void)pid;(void)status;(void)options;(void)retval;
+sys_fork(pid_t pid, struct trapframe *tf) { 
+
     /* Create process structure for child process */
     struct proc *childProc = proc_create_runprogram("childProc");
     if (childProc == NULL) {
@@ -122,6 +129,21 @@ sys_fork(pid_t pid,
     spinlock_release(&childProc->p_lock);
     DEBUG(DB_LOCORE,"Fork123: childas(%d)\n",sizeof(childProc->p_addrspace));
 
+    /* Assign PID to child process and create the parent/child relationship */
+    lock_acquire(pidCountLock);
+      pidCount += 1;
+    lock_release(pidCountLock);
+    childProc->pid = pidCount;
+    // current process's pid = pid?
+    childProc->parent = pid;
+
+    /* Create thread for child process */
+    // TO DO: trapframe synchronization
+    thread_fork("childProc", childProc, 
+                enter_forked_process(tf, pidCount), tf, pidCount);
+
+
     return (0);
 }
+#endif
 
