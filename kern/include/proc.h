@@ -74,8 +74,9 @@ struct proc {
 	int parent	/* Parent's pid of this process */
 #endif
 };
-
+#if OPT_A2
 extern unsigned long volatile pidCount;
+#endif
 /* This is the process structure for the kernel and for kernel-only threads. */
 extern struct proc *kproc;
 

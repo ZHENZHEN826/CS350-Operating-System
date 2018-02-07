@@ -205,9 +205,13 @@ proc_bootstrap(void)
   if (kproc == NULL) {
     panic("proc_create for kproc failed\n");
   }
+#if OPT_A2
+  pidCount = 0;
+#endif
+
 #ifdef UW
   proc_count = 0;
-  pid_count = 0;
+  
   proc_count_mutex = sem_create("proc_count_mutex",1);
   if (proc_count_mutex == NULL) {
     panic("could not create proc_count_mutex semaphore\n");

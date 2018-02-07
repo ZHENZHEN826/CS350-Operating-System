@@ -130,7 +130,7 @@ syscall(struct trapframe *tf)
 			    (pid_t *)&retval);
 	  break;
 	case SYS_fork:
-	  err = sys_waitpid((pid_t)tf->tf_a0, tf);
+	  err = sys_fork((pid_t)tf->tf_a0, tf);
 	  break;
 
 #endif // UW
@@ -181,15 +181,16 @@ syscall(struct trapframe *tf)
  * Thus, you can trash it and do things another way if you prefer.
  */
 void
-enter_forked_process(struct trapframe *tf, unsigned long)
-{
+enter_forked_process(struct trapframe *tf, unsigned long data2)
+{	
+  (void)data2;
   // parent trap frame, put on new stack, kernel stack of child
-  struct trapframe t = *(tf);
+  struct trapframe *t = tf;
   // change child's trapframe values before going back to userspace from fork
   // 	a3 for result success or fail code
   // 	v0 for return value or error code
-  t.tf_v0 = 0;
-  t.tf_a3 = 0;
-  t.tf_epc += 4;
+  t->tf_v0 = 0;
+  t->tf_a3 = 0;
+  t->tf_epc += 4;
   mips_usermode(t);
 } 
