@@ -38,7 +38,6 @@
 
 #include <spinlock.h>
 #include <thread.h> /* required for struct threadarray */
-#include <synch.h>
 #include "opt-A2.h"
 
 struct addrspace;
@@ -49,7 +48,6 @@ struct semaphore;
 
 #if OPT_A2
 volatile unsigned long pidCount;
-struct lock *pidCountLock = lock_create("pidCount");
 #endif
 
 /*

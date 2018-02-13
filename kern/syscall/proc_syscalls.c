@@ -194,10 +194,10 @@ sys_fork(pid_t *retval, struct trapframe *tf) {
     spinlock_release(&childProc->p_lock);
 
     /* Assign PID to child process and create the parent/child relationship */
-    lock_acquire(pidCountLock);
-      pidCount += 1;
-      childProc->pid = pidCount;
-    lock_release(pidCountLock);
+//    lock_acquire(pidCountLock);
+//      pidCount += 1;
+//      childProc->pid = pidCount;
+//    lock_release(pidCountLock);
     DEBUG(DB_LOCORE,"Fork202: pidCount = %lu \n", pidCount);
 
     // current process's pid

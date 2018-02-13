@@ -48,7 +48,7 @@
 #include <addrspace.h>
 #include <vnode.h>
 #include <vfs.h>
-//#include <synch.h>
+#include <synch.h>
 #include <kern/fcntl.h>  
 #include "opt-A2.h"
 
@@ -69,8 +69,8 @@ static volatile unsigned int proc_count;
 static struct semaphore *proc_count_mutex;
 /* used to signal the kernel menu thread when there are no processes */
 struct semaphore *no_proc_sem;   
+struct lock *pidCountLock; 
 #endif  // UW
-
 
 
 /*
@@ -207,6 +207,7 @@ proc_bootstrap(void)
     panic("proc_create for kproc failed\n");
   }
 #if OPT_A2
+  pidCountLock = lock_create("pidCount");
   pidCount = 0;
 #endif
 
@@ -257,8 +258,8 @@ proc_create_runprogram(const char *name)
 #if OPT_A2
 	lock_acquire(pidCountLock);
 	  pidCount += 1;
-      proc->pid = pidCount;
-    lock_release(pidCountLock);
+          proc->pid = pidCount;
+        lock_release(pidCountLock);
 #endif
 	proc->p_addrspace = NULL;
 
