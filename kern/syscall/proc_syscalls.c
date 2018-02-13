@@ -10,7 +10,7 @@
 #include <addrspace.h>
 #include <copyinout.h>
 #include <synch.h>
-#include <limit.h>
+#include <limits.h>
 #include <mips/trapframe.h>
 #include "opt-A2.h"
 
@@ -29,18 +29,19 @@ void sys__exit(int exitcode) {
 
   // For child, if parents live, wake them up
   if (p->parent != -1){
-    cv_signal(p->waitExit, waitExitLock);
+    cv_signal(p->waitExit, p->waitExitLock);
   } else {
-    // Else, check children, 
-    for (int i = __PID_MIN; i < (__PID_MIN + array_num(processArray)); i++){
+    // Else, check children,
+// PROBLEM HERE. 
+    for (unsigned int i = __PID_MIN; i < (__PID_MIN + array_num(processArray)); i++){
       struct proc *pidProc = array_get(processArray, i);
-      if (p->PID == pidProc->parent){
+      if (p->pid == pidProc->parent){
         // if any live children, detach the children and parent relationship
-        if (exitStatus != -1){
+        if (pidProc->exitStatus != -1){
           pidProc->parent = -1;
-          // release children's exit lock, so that they can exit
-          lock_release(pidproc->exitLock);
-        } 
+        }
+	// release children's exit lock, so that they can exit
+        lock_release(pidProc->exitLock); 
       }
     }
     // For child, if my parent is died, fully delete myself, b/c no parent can call waitpid
@@ -124,7 +125,7 @@ sys_waitpid(pid_t pid,
   struct proc *pidProc = array_get(processArray, pid);
   // pid is not your child
   if (pidProc->parent != p->pid){
-    return ECHILD
+    return ECHILD;
   }
   // The pid argument named a nonexistent process.
   if (pidProc == NULL){
@@ -204,7 +205,7 @@ sys_fork(pid_t *retval, struct trapframe *tf) {
     if (as_copy_status != 0){
         kfree(oldas);
         kfree(newas);
-        proc_destroy(child_proc);
+        proc_destroy(childProc);
         return as_copy_status;
     }
 
@@ -213,9 +214,9 @@ sys_fork(pid_t *retval, struct trapframe *tf) {
     childProc->p_addrspace = newas;
     spinlock_release(&childProc->p_lock);
 
-    DEBUG(DB_LOCORE,"Fork118: oldas(%d) newas(%d)\n",oldas->as_vbase1,newas->as_vbase1);
-    DEBUG(DB_LOCORE,"Fork202: pidCount = %lu \n", childProc->pid);
-
+    //DEBUG(DB_LOCORE,"Fork118: oldas(%d) newas(%d)\n",oldas->as_vbase1,newas->as_vbase1);
+    DEBUG(DB_LOCORE,"Fork202: childProc->pid = %d \n", childProc->pid);
+    DEBUG(DB_LOCORE,"Fork202: curProc->pid = %d \n", curproc->pid);
     /* Create the parent/child relationship */
     // current process's pid
     childProc->parent = curproc->pid;

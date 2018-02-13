@@ -48,6 +48,7 @@ struct semaphore;
 
 #if OPT_A2
 volatile unsigned long pidCount;
+extern struct array *processArray;
 #endif
 
 /*

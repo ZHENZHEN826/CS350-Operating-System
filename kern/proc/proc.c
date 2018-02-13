@@ -74,7 +74,7 @@ struct semaphore *no_proc_sem;
 #if OPT_A2  
 struct lock *pidCountLock;
 struct array *processArray;
-struct lock *preocessArrayLock; 
+struct lock *processArrayLock; 
 #endif
 
 
@@ -114,9 +114,9 @@ proc_create(const char *name)
 	proc->pid = -1;
 	proc->parent = -1;
 	proc->exitStatus = -1;
-	waitExit = cv_create("waitExit");
-	waitExitLock = lock_create("waitExit");
-	exitLock = lock_create("exitLock");
+	proc->waitExit = cv_create("waitExit");
+	proc->waitExitLock = lock_create("waitExit");
+	proc->exitLock = lock_create("exitLock");
 #endif
 	return proc;
 }
@@ -185,16 +185,13 @@ proc_destroy(struct proc *proc)
 #if OPT_A2
 	// set the entry to NULL in process table
 	// cannot remove because sys__exit need to loop proc table by PID
-	lock_acquire(preocessArrayLock); 
+	lock_acquire(processArrayLock); 
 	  array_set(processArray, proc->pid, NULL);
-	lock_release(preocessArrayLock);
+	lock_release(processArrayLock);
 
 	cv_destroy(proc->waitExit);
 	lock_destroy(proc->waitExitLock);
 	lock_destroy(proc->exitLock);
-	struct array *processArray;
-
-	
 #endif
 	kfree(proc);
 #ifdef UW
@@ -308,7 +305,8 @@ proc_create_runprogram(const char *name)
     lock_release(pidCountLock);
 
     lock_acquire(processArrayLock);
-      array_add(processArray, proc, proc->pid);
+      unsigned int pid;
+      array_add(processArray, proc, &(pid));
     lock_release(processArrayLock);
 #endif
 
