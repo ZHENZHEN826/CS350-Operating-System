@@ -10,6 +10,7 @@
 #include <addrspace.h>
 #include <copyinout.h>
 #include <synch.h>
+#include <limit.h>
 #include <mips/trapframe.h>
 #include "opt-A2.h"
 
@@ -22,21 +23,32 @@ void sys__exit(int exitcode) {
   struct proc *p = curproc;
   
 #if OPT_A2
-  /*
-  // return exitcode?
-  // For child, if parents live
-  if (curthread->parent > 0 ){
-    // save exitcode somewhere, for parent to retrieve
-    // Exit code is passed to the parent process?
-    cv_signal(my parent);
-  }
-  // For child, if my parents is died, fully delete myself, b/c no parent can call waitpid
-  proc_destroy(curthread?);
 
-  // For parents, check children, if any zombie children, delete them
-  // if any live children, detach the children and parent relationship
-  proc_destroy(child process);
-  */
+  // save exitcode for parent to retrieve
+  p->exitStatus = _MKWAIT_EXIT(exitcode);
+
+  // For child, if parents live, wake them up
+  if (p->parent != -1){
+    cv_signal(p->waitExit, waitExitLock);
+  } else {
+    // Else, check children, 
+    for (int i = __PID_MIN; i < (__PID_MIN + array_num(processArray)); i++){
+      struct proc *pidProc = array_get(processArray, i);
+      if (p->PID == pidProc->parent){
+        // if any live children, detach the children and parent relationship
+        if (exitStatus != -1){
+          pidProc->parent = -1;
+          // release children's exit lock, so that they can exit
+          lock_release(pidproc->exitLock);
+        } 
+      }
+    }
+    // For child, if my parent is died, fully delete myself, b/c no parent can call waitpid
+    // For parent, fully delete myself
+    // Meaning, if no living parent, fully delete myself
+    // proc_destroy(p);
+  } 
+  
 #else
   /* for now, just include this to keep the compiler from complaining about
      an unused variable */
@@ -60,6 +72,12 @@ void sys__exit(int exitcode) {
   /* detach this thread from its process */
   /* note: curproc cannot be used after this call */
   proc_remthread(curthread);
+
+#if OPT_A2
+  // prevent child process exit before parent process
+  lock_acquire(p->exitLock);
+  lock_release(p->exitLock);
+#endif
 
   /* if this is the last user process in the system, proc_destroy()
      will wake up the kernel menu thread */
@@ -101,14 +119,15 @@ sys_waitpid(pid_t pid,
   int exitstatus;
   int result;
 
-//#if OPT_A2
-  /*
+#if OPT_A2
+  struct proc *p = curproc;
+  struct proc *pidProc = array_get(processArray, pid);
   // pid is not your child
-  if (){
+  if (pidProc->parent != p->pid){
     return ECHILD
   }
   // The pid argument named a nonexistent process.
-  if (){
+  if (pidProc == NULL){
     return ESRCH;
   }
   // The status argument was an invalid pointer.
@@ -118,21 +137,22 @@ sys_waitpid(pid_t pid,
   if (options != 0) {
     return(EINVAL);
   }
-
-  // while the child hasn't exited, go to sleep, sync to make sure no context switch
-  // cv to the child process
-  while (){
-   
-  }
-  // get the exitstatus somewhere
   
-  exitstatus = __WEXITED;
-  // what is exitcode?
-  int exitcode = _MKWAIT_EXIT(exitstatus);
-  // fire this child
-  proc_destroy(THIS CHILD)
-  */
-//#else
+  // while the child hasn't exited, go to sleep.
+  // cv on the child process
+  lock_acquire(pidProc->waitExitLock);
+  while (pidProc->exitStatus == -1){
+    cv_wait(pidProc->waitExit, pidProc->waitExitLock); 
+  }
+  // get the exitstatus from child
+  exitstatus = pidProc->exitStatus;
+  lock_release(pidProc->waitExitLock);
+
+  // fire this child?
+  //proc_destroy(pidProc);
+  //array_remove(processArray, i);
+
+#else
   /* this is just a stub implementation that always reports an
      exit status of 0, regardless of the actual exit status of
      the specified process.   
@@ -146,7 +166,7 @@ sys_waitpid(pid_t pid,
   }
   /* for now, just pretend the exitstatus is 0 */
   exitstatus = 0;
-//#endif 
+#endif 
 
   result = copyout((void *)&exitstatus,status,sizeof(int));
   if (result) {
@@ -160,22 +180,20 @@ sys_waitpid(pid_t pid,
 
 int
 sys_fork(pid_t *retval, struct trapframe *tf) { 
-    //The current user already has too many processes.
-    /*
-    if (){
-      return EMPROC;
-    }
     //There are already too many processes on the system.
-    if () {
+    if (array_num(processArray) >= __PID_MAX) {
+      // EMPROC - The current user already has too many processes.
+      // Since there is only one user, EMPROC and ENPROC are the same.
       return ENPROC;
     }
-    */
 
     /* Create process structure for child process */
     struct proc *childProc = proc_create_runprogram("childProc");
     if (childProc == NULL) {
         return ENOMEM;
     }
+    lock_acquire(childProc->exitLock);
+    
     /* Create and copy address space */
     struct addrspace *oldas = curproc->p_addrspace;
     struct addrspace *newas;
@@ -183,23 +201,22 @@ sys_fork(pid_t *retval, struct trapframe *tf) {
     // the pages from the old address space to the new one
     int as_copy_status = as_copy(oldas, &newas);
     // if as_copy return an error
-    if (as_copy_status > 0){
+    if (as_copy_status != 0){
+        kfree(oldas);
+        kfree(newas);
+        proc_destroy(child_proc);
         return as_copy_status;
     }
-    childProc->p_addrspace = newas;
-    DEBUG(DB_LOCORE,"Fork118: oldas(%d) newas(%d)\n",oldas->as_vbase1,newas->as_vbase1);
+
     // associate address space with the child process
     spinlock_acquire(&childProc->p_lock);
     childProc->p_addrspace = newas;
     spinlock_release(&childProc->p_lock);
 
-    /* Assign PID to child process and create the parent/child relationship */
-//    lock_acquire(pidCountLock);
-//      pidCount += 1;
-//      childProc->pid = pidCount;
-//    lock_release(pidCountLock);
-    DEBUG(DB_LOCORE,"Fork202: pidCount = %lu \n", pidCount);
+    DEBUG(DB_LOCORE,"Fork118: oldas(%d) newas(%d)\n",oldas->as_vbase1,newas->as_vbase1);
+    DEBUG(DB_LOCORE,"Fork202: pidCount = %lu \n", childProc->pid);
 
+    /* Create the parent/child relationship */
     // current process's pid
     childProc->parent = curproc->pid;
 
@@ -210,16 +227,22 @@ sys_fork(pid_t *retval, struct trapframe *tf) {
     // Solution: Copy parents trapframe on the heap 
     // and pass a pointer to the copy into the entrypoint function.
     struct trapframe *childTf = kmalloc(sizeof(struct trapframe));
+    if(childTf == NULL){
+      proc_destroy(childProc);
+      return ENOMEM;
+    }
     *childTf = *tf;
     // create a new thread
     int forkResult = thread_fork("childProc", childProc, enter_forked_process, childTf, 0);
     if(forkResult != 0){
-      proc_destroy(childProc);
+      kfree(oldas);
+      kfree(newas);
       kfree(childTf);
+      proc_destroy(childProc);
       return forkResult;
     }
 
-    *retval = pidCount;
+    *retval = childProc->pid;
     return 0;
 }
 #endif

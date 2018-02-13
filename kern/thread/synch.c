@@ -292,7 +292,7 @@ void
 cv_wait(struct cv *cv, struct lock *lock)
 {
         // Make sure curthread is in the critical section (own the lock)
-        KASSERT(lock->lock_owner == curthread);
+        KASSERT(lock_do_i_hold(lock));
         
         wchan_lock(cv->cv_wchan);   // Lock the wait channel
         lock_release(lock);         // Release the lock, and other thread may enter

@@ -54,15 +54,15 @@ volatile unsigned long pidCount;
  * Process structure.
  */
 struct proc {
-	char *p_name;			/* Name of this process */
-	struct spinlock p_lock;		/* Lock for this structure */
+	char *p_name;					/* Name of this process */
+	struct spinlock p_lock;			/* Lock for this structure */
 	struct threadarray p_threads;	/* Threads in this process */
 
 	/* VM */
 	struct addrspace *p_addrspace;	/* virtual address space */
 
 	/* VFS */
-	struct vnode *p_cwd;		/* current working directory */
+	struct vnode *p_cwd;			/* current working directory */
 
 #ifdef UW
   /* a vnode to refer to the console device */
@@ -70,13 +70,19 @@ struct proc {
   /* you will probably need to change this when implementing file-related
      system calls, since each process will need to keep track of all files
      it has opened, not just the console. */
-  struct vnode *console;                /* a vnode for the console device */
+  struct vnode *console;            /* a vnode for the console device */
 #endif
 
 	/* add more material here as needed */
 #if OPT_A2
-	int pid;	/* PID of this process */
-	int parent;	/* Parent's pid of this process */
+	int pid;		/* PID of this process */
+	int parent;		/* Parent's pid of this process */
+
+	int exitStatus; /* Child proecess, add exitStatus for parent to retrieve */
+
+	struct cv *waitExit;  	    /* Let parent process sleep on Child's cv*/
+	struct lock *waitExitLock;  /* Lock for cv waitExit*/
+	struct lock *exitLock;		/* Prevent child process exit before parent process */
 #endif
 };
 

@@ -68,9 +68,14 @@ static volatile unsigned int proc_count;
 /* it would be better to use a lock here, but we use a semaphore because locks are not implemented in the base kernel */ 
 static struct semaphore *proc_count_mutex;
 /* used to signal the kernel menu thread when there are no processes */
-struct semaphore *no_proc_sem;   
-struct lock *pidCountLock; 
+struct semaphore *no_proc_sem; 
 #endif  // UW
+
+#if OPT_A2  
+struct lock *pidCountLock;
+struct array *processArray;
+struct lock *preocessArrayLock; 
+#endif
 
 
 /*
@@ -106,8 +111,12 @@ proc_create(const char *name)
 #endif // UW
 
 #if OPT_A2
-	proc->pid = pidCount;
-	proc->parent = 0;
+	proc->pid = -1;
+	proc->parent = -1;
+	proc->exitStatus = -1;
+	waitExit = cv_create("waitExit");
+	waitExitLock = lock_create("waitExit");
+	exitLock = lock_create("exitLock");
 #endif
 	return proc;
 }
@@ -174,8 +183,18 @@ proc_destroy(struct proc *proc)
 
 	kfree(proc->p_name);
 #if OPT_A2
-	//kfree(proc.pid);
-	//kfree(proc.parent)
+	// set the entry to NULL in process table
+	// cannot remove because sys__exit need to loop proc table by PID
+	lock_acquire(preocessArrayLock); 
+	  array_set(processArray, proc->pid, NULL);
+	lock_release(preocessArrayLock);
+
+	cv_destroy(proc->waitExit);
+	lock_destroy(proc->waitExitLock);
+	lock_destroy(proc->exitLock);
+	struct array *processArray;
+
+	
 #endif
 	kfree(proc);
 #ifdef UW
@@ -207,12 +226,16 @@ proc_bootstrap(void)
     panic("proc_create for kproc failed\n");
   }
 #if OPT_A2
+  // Initialize process table, PID
   pidCountLock = lock_create("pidCount");
   pidCount = 0;
+  processArray = array_create();
+  array_init(processArray);
+  processArrayLock = lock_create("processArray");
 #endif
 
 #ifdef UW
-  proc_count = 0;
+  proc_count = 1;
   
   proc_count_mutex = sem_create("proc_count_mutex",1);
   if (proc_count_mutex == NULL) {
@@ -253,14 +276,9 @@ proc_create_runprogram(const char *name)
 	}
 	kfree(console_path);
 #endif // UW
-	  
+
 	/* VM fields */
-#if OPT_A2
-	lock_acquire(pidCountLock);
-	  pidCount += 1;
-          proc->pid = pidCount;
-        lock_release(pidCountLock);
-#endif
+
 	proc->p_addrspace = NULL;
 
 	/* VFS fields */
@@ -281,6 +299,18 @@ proc_create_runprogram(const char *name)
 	}
 	spinlock_release(&curproc->p_lock);
 #endif // UW
+
+	  
+#if OPT_A2
+	lock_acquire(pidCountLock);
+	  pidCount += 1;
+      proc->pid = pidCount;
+    lock_release(pidCountLock);
+
+    lock_acquire(processArrayLock);
+      array_add(processArray, proc, proc->pid);
+    lock_release(processArrayLock);
+#endif
 
 #ifdef UW
 	/* increment the count of processes */
