@@ -19,9 +19,26 @@ void sys__exit(int exitcode) {
 
   struct addrspace *as;
   struct proc *p = curproc;
+  
+#if OPT_A2
+  // return exitcode?
+  // For child, if parents live
+  if (curthread->parent > 0 ){
+    // save exitcode somewhere, for parent to retrieve
+    // Exit code is passed to the parent process?
+    cv_signal(my parent);
+  }
+  // For child, if my parents is died, fully delete myself, b/c no parent can call waitpid
+  proc_destroy(curthread?);
+
+  // For parents, check children, if any zombie children, delete them
+  // if any live children, detach the children and parent relationship
+  proc_destroy(child process);
+#else
   /* for now, just include this to keep the compiler from complaining about
      an unused variable */
   (void)exitcode;
+#endif
 
   DEBUG(DB_SYSCALL,"Syscall: _exit(%d)\n",exitcode);
 
@@ -81,6 +98,36 @@ sys_waitpid(pid_t pid,
   int exitstatus;
   int result;
 
+#if OPT_A2
+  // pid is not your child
+  if (){
+    return ECHILD
+  }
+  // The pid argument named a nonexistent process.
+  if (){
+    return ESRCH;
+  }
+  // The status argument was an invalid pointer.
+  if(status == NULL){
+    return EFAULT;
+  }
+  if (options != 0) {
+    return(EINVAL);
+  }
+
+  // while the child hasn't exited, go to sleep, sync to make sure no context switch
+  // cv to the child process
+  while (){
+   
+  }
+  // get the exitstatus somewhere
+  
+  exitstatus = __WEXITED;
+  // what is exitcode?
+  int exitcode = _MKWAIT_EXIT(exitstatus);
+  // fire this child
+  proc_destroy(THIS CHILD)
+#else
   /* this is just a stub implementation that always reports an
      exit status of 0, regardless of the actual exit status of
      the specified process.   
@@ -89,12 +136,13 @@ sys_waitpid(pid_t pid,
 
      Fix this!
   */
-
   if (options != 0) {
     return(EINVAL);
   }
   /* for now, just pretend the exitstatus is 0 */
   exitstatus = 0;
+#endif 
+
   result = copyout((void *)&exitstatus,status,sizeof(int));
   if (result) {
     return(result);
@@ -106,13 +154,21 @@ sys_waitpid(pid_t pid,
 #if OPT_A2
 
 int
-sys_fork(pid_t pid, struct trapframe *tf) { 
+sys_fork(pid_t *retval, struct trapframe *tf) { 
+    //The current user already has too many processes.
+    if (){
+      return EMPROC;
+    }
+    //There are already too many processes on the system.
+    if () {
+      return ENPROC;
+    }
     struct lock *pidCountLock = lock_create("pidCount");
 
     /* Create process structure for child process */
     struct proc *childProc = proc_create_runprogram("childProc");
     if (childProc == NULL) {
-        return -1;
+        return ENOMEM;
     }
     /* Create and copy address space */
     struct addrspace *oldas = curproc->p_addrspace;
@@ -135,16 +191,25 @@ sys_fork(pid_t pid, struct trapframe *tf) {
     /* Assign PID to child process and create the parent/child relationship */
     lock_acquire(pidCountLock);
       pidCount += 1;
+      childProc->pid = pidCount;
     lock_release(pidCountLock);
-    childProc->pid = pidCount;
-    // current process's pid = pid?
-    childProc->parent = pid;
-    (void)tf;
+    
+    // current process's pid
+    childProc->parent = curProc->pid;
+
     /* Create thread for child process */
-    // TO DO: trapframe synchronization
-    //int forkSuccess = thread_fork("childProc", childProc, enter_forked_process, tf, pidCount);
 
+    // Can we just pass the parent's trapframe pointer to thread_fork?
+    // No, parent process may exit before child thread created, parent's trapframe may already be deleted.
+    // Solution: Copy parents trapframe on the heap 
+    // and pass a pointer to the copy into the entrypoint function.
+    struct trapframe *childTf = kmalloc(sizeof(struct trapframe));
+    childTf = Tf;
+    // create a new thread
+    int forkSuccess = thread_fork("childProc", childProc, enter_forked_process, childTf, pidCount);
+    //kfree(childTf) here?
 
+    *retval = pidCount;
     return 0;
 }
 #endif
