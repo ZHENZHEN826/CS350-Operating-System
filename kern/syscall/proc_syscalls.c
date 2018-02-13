@@ -10,6 +10,7 @@
 #include <addrspace.h>
 #include <copyinout.h>
 #include <synch.h>
+#include <mips/trapframe.h>
 #include "opt-A2.h"
 
   /* this implementation of sys__exit does not do anything with the exit code */
@@ -100,7 +101,7 @@ sys_waitpid(pid_t pid,
   int exitstatus;
   int result;
 
-#if OPT_A2
+//#if OPT_A2
   /*
   // pid is not your child
   if (){
@@ -131,7 +132,7 @@ sys_waitpid(pid_t pid,
   // fire this child
   proc_destroy(THIS CHILD)
   */
-#else
+//#else
   /* this is just a stub implementation that always reports an
      exit status of 0, regardless of the actual exit status of
      the specified process.   
@@ -145,7 +146,7 @@ sys_waitpid(pid_t pid,
   }
   /* for now, just pretend the exitstatus is 0 */
   exitstatus = 0;
-#endif 
+//#endif 
 
   result = copyout((void *)&exitstatus,status,sizeof(int));
   if (result) {
@@ -160,6 +161,7 @@ sys_waitpid(pid_t pid,
 int
 sys_fork(pid_t *retval, struct trapframe *tf) { 
     //The current user already has too many processes.
+    /*
     if (){
       return EMPROC;
     }
@@ -167,6 +169,7 @@ sys_fork(pid_t *retval, struct trapframe *tf) {
     if () {
       return ENPROC;
     }
+    */
     struct lock *pidCountLock = lock_create("pidCount");
 
     /* Create process structure for child process */
@@ -177,7 +180,6 @@ sys_fork(pid_t *retval, struct trapframe *tf) {
     /* Create and copy address space */
     struct addrspace *oldas = curproc->p_addrspace;
     struct addrspace *newas;
-    DEBUG(DB_LOCORE,"Fork110: oldas(%d) newas(%d)\n",sizeof(oldas),sizeof(newas));
     // as_copy: creates a new address spaces, and copies 
     // the pages from the old address space to the new one
     int as_copy_status = as_copy(oldas, &newas);
@@ -185,21 +187,21 @@ sys_fork(pid_t *retval, struct trapframe *tf) {
     if (as_copy_status > 0){
         return as_copy_status;
     }
-    DEBUG(DB_LOCORE,"Fork118: oldas(%d) newas(%d)\n",sizeof(oldas),sizeof(newas));
+    childProc->p_addrspace = newas;
+    DEBUG(DB_LOCORE,"Fork118: oldas(%d) newas(%d)\n",oldas->as_vbase1,newas->as_vbase1);
     // associate address space with the child process
     spinlock_acquire(&childProc->p_lock);
     childProc->p_addrspace = newas;
     spinlock_release(&childProc->p_lock);
-    DEBUG(DB_LOCORE,"Fork123: childas(%d)\n",sizeof(childProc->p_addrspace));
 
     /* Assign PID to child process and create the parent/child relationship */
     lock_acquire(pidCountLock);
       pidCount += 1;
       childProc->pid = pidCount;
     lock_release(pidCountLock);
-    
+    DEBUG(DB_LOCORE,"Fork202: pidCount = %lu \n", pidCount);
     // current process's pid
-    childProc->parent = curProc->pid;
+    childProc->parent = curproc->pid;
 
     /* Create thread for child process */
 
@@ -208,9 +210,12 @@ sys_fork(pid_t *retval, struct trapframe *tf) {
     // Solution: Copy parents trapframe on the heap 
     // and pass a pointer to the copy into the entrypoint function.
     struct trapframe *childTf = kmalloc(sizeof(struct trapframe));
-    childTf = Tf;
+    *childTf = *tf;
     // create a new thread
-    int forkSuccess = thread_fork("childProc", childProc, enter_forked_process, childTf, pidCount);
+    int forkResult = thread_fork("childProc", childProc, enter_forked_process, childTf, 0);
+    if(forkResult != 0){
+        return forkResult;
+    }
     //kfree(childTf) here?
 
     *retval = pidCount;

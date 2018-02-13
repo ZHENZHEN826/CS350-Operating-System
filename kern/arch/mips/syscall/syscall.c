@@ -132,7 +132,8 @@ syscall(struct trapframe *tf)
 	  break;
 #if OPT_A2
 	case SYS_fork:
-	  err = sys_fork((pid_t *)&retval), tf);
+	  err = sys_fork((pid_t *)&retval, tf);
+
 	  break;
 #endif
 
@@ -189,14 +190,17 @@ enter_forked_process(void *tf, unsigned long data2)
 {	
   (void)data2;
   // parent trap frame, put on new stack, kernel stack of child
-  struct trapframe *t = tf;
+  struct trapframe *ttf = tf;
+  struct trapframe t;
+  t = *ttf;
+  //kfree(ttf);
   // change child's trapframe values before going back to userspace from fork
   // 	a3 for result success or fail code
   // 	v0 for return value or error code
-  t->tf_v0 = 0;
-  t->tf_a3 = 0;
-  t->tf_epc += 4;
-  mips_usermode(t);
+  t.tf_v0 = 0;
+  t.tf_a3 = 0;
+  t.tf_epc += 4;
+  mips_usermode(&t);
 } 
 #else
 void
