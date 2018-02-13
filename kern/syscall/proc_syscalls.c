@@ -76,7 +76,7 @@ int
 sys_getpid(pid_t *retval)
 {
 #if OPT_A2
-  *retval = 1;
+  *retval = curproc->pid;
   // TO DO:
   // Need to perform process assignment even without/before any fork calls.
   //   The first user process might call getpid before creating any children. 
@@ -86,8 +86,8 @@ sys_getpid(pid_t *retval)
   /* for now, this is just a stub that always returns a PID of 1 */
   /* you need to fix this to make it work properly */
   *retval = 1;
-  return(0);
-#endif 
+#endif
+  return (0); 
 }
 
 /* stub handler for waitpid() system call                */
