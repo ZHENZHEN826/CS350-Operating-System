@@ -170,7 +170,6 @@ sys_fork(pid_t *retval, struct trapframe *tf) {
       return ENPROC;
     }
     */
-    struct lock *pidCountLock = lock_create("pidCount");
 
     /* Create process structure for child process */
     struct proc *childProc = proc_create_runprogram("childProc");
@@ -200,6 +199,7 @@ sys_fork(pid_t *retval, struct trapframe *tf) {
       childProc->pid = pidCount;
     lock_release(pidCountLock);
     DEBUG(DB_LOCORE,"Fork202: pidCount = %lu \n", pidCount);
+
     // current process's pid
     childProc->parent = curproc->pid;
 
@@ -214,9 +214,10 @@ sys_fork(pid_t *retval, struct trapframe *tf) {
     // create a new thread
     int forkResult = thread_fork("childProc", childProc, enter_forked_process, childTf, 0);
     if(forkResult != 0){
-        return forkResult;
+      proc_destroy(childProc);
+      kfree(childTf);
+      return forkResult;
     }
-    //kfree(childTf) here?
 
     *retval = pidCount;
     return 0;

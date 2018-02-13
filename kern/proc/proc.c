@@ -48,7 +48,7 @@
 #include <addrspace.h>
 #include <vnode.h>
 #include <vfs.h>
-#include <synch.h>
+//#include <synch.h>
 #include <kern/fcntl.h>  
 #include "opt-A2.h"
 
@@ -254,7 +254,12 @@ proc_create_runprogram(const char *name)
 #endif // UW
 	  
 	/* VM fields */
-
+#if OPT_A2
+	lock_acquire(pidCountLock);
+	  pidCount += 1;
+      proc->pid = pidCount;
+    lock_release(pidCountLock);
+#endif
 	proc->p_addrspace = NULL;
 
 	/* VFS fields */
