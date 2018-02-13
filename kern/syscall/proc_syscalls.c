@@ -9,6 +9,7 @@
 #include <thread.h>
 #include <addrspace.h>
 #include <copyinout.h>
+#include <synch.h>
 #include "opt-A2.h"
 
   /* this implementation of sys__exit does not do anything with the exit code */
@@ -55,6 +56,7 @@ int
 sys_getpid(pid_t *retval)
 {
 #if OPT_A2
+  *retval = 1;
   // TO DO:
   // Need to perform process assignment even without/before any fork calls.
   //   The first user process might call getpid before creating any children. 
@@ -102,10 +104,10 @@ sys_waitpid(pid_t pid,
 }
 
 #if OPT_A2
-struct lock *pidCountLock = lock_create("pidCount");
 
 int
 sys_fork(pid_t pid, struct trapframe *tf) { 
+    struct lock *pidCountLock = lock_create("pidCount");
 
     /* Create process structure for child process */
     struct proc *childProc = proc_create_runprogram("childProc");
@@ -137,14 +139,13 @@ sys_fork(pid_t pid, struct trapframe *tf) {
     childProc->pid = pidCount;
     // current process's pid = pid?
     childProc->parent = pid;
-
+    (void)tf;
     /* Create thread for child process */
     // TO DO: trapframe synchronization
-    thread_fork("childProc", childProc, 
-                enter_forked_process(tf, pidCount), tf, pidCount);
+    //int forkSuccess = thread_fork("childProc", childProc, enter_forked_process, tf, pidCount);
 
 
-    return (0);
+    return 0;
 }
 #endif
 

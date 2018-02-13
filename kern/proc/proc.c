@@ -50,6 +50,7 @@
 #include <vfs.h>
 #include <synch.h>
 #include <kern/fcntl.h>  
+#include "opt-A2.h"
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -62,6 +63,7 @@ struct proc *kproc;
 #ifdef UW
 /* count of the number of processes, excluding kproc */
 static volatile unsigned int proc_count;
+
 /* provides mutual exclusion for proc_count */
 /* it would be better to use a lock here, but we use a semaphore because locks are not implemented in the base kernel */ 
 static struct semaphore *proc_count_mutex;
@@ -172,11 +174,10 @@ proc_destroy(struct proc *proc)
 
 	kfree(proc->p_name);
 #if OPT_A2
-	kfree(proc->pid);
-	kfree(proc->parent)
-	kfree(proc);
+	//kfree(proc.pid);
+	//kfree(proc.parent)
 #endif
-
+	kfree(proc);
 #ifdef UW
 	/* decrement the process count */
         /* note: kproc is not included in the process count, but proc_destroy

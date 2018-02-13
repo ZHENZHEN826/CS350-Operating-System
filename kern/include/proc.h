@@ -46,6 +46,10 @@ struct vnode;
 struct semaphore;
 #endif // UW
 
+#if OPT_A2
+volatile unsigned long pidCount;
+#endif
+
 /*
  * Process structure.
  */
@@ -72,12 +76,10 @@ struct proc {
 	/* add more material here as needed */
 #if OPT_A2
 	int pid;	/* PID of this process */
-	int parent	/* Parent's pid of this process */
+	int parent;	/* Parent's pid of this process */
 #endif
 };
-#if OPT_A2
-extern unsigned long volatile pidCount;
-#endif
+
 /* This is the process structure for the kernel and for kernel-only threads. */
 extern struct proc *kproc;
 
