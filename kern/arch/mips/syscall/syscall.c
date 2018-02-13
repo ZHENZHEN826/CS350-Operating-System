@@ -185,7 +185,7 @@ syscall(struct trapframe *tf)
  */
 #if OPT_A2
 void
-enter_forked_process(struct trapframe *tf, unsigned long data2)
+enter_forked_process(void *tf, unsigned long data2)
 {	
   (void)data2;
   // parent trap frame, put on new stack, kernel stack of child

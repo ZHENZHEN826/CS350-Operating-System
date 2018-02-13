@@ -21,6 +21,7 @@ void sys__exit(int exitcode) {
   struct proc *p = curproc;
   
 #if OPT_A2
+  /*
   // return exitcode?
   // For child, if parents live
   if (curthread->parent > 0 ){
@@ -34,6 +35,7 @@ void sys__exit(int exitcode) {
   // For parents, check children, if any zombie children, delete them
   // if any live children, detach the children and parent relationship
   proc_destroy(child process);
+  */
 #else
   /* for now, just include this to keep the compiler from complaining about
      an unused variable */
@@ -99,6 +101,7 @@ sys_waitpid(pid_t pid,
   int result;
 
 #if OPT_A2
+  /*
   // pid is not your child
   if (){
     return ECHILD
@@ -127,6 +130,7 @@ sys_waitpid(pid_t pid,
   int exitcode = _MKWAIT_EXIT(exitstatus);
   // fire this child
   proc_destroy(THIS CHILD)
+  */
 #else
   /* this is just a stub implementation that always reports an
      exit status of 0, regardless of the actual exit status of
