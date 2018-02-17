@@ -42,9 +42,9 @@ void sys__exit(int exitcode) {
     if (p->pid == pidProc->parent){
       
       // if any live children, detach the children and parent relationship
-      //if (pidProc->exitStatus != -1){
-      pidProc->parent = -1;
-      //}
+      if (pidProc->exitStatus != -1){
+        pidProc->parent = -1;
+      }
 	    // release children's exit lock, so that they can exit
       lock_release(pidProc->exitLock); 
     }
@@ -105,6 +105,7 @@ sys_getpid(pid_t *retval)
   // Need to perform process assignment even without/before any fork calls.
   //   The first user process might call getpid before creating any children. 
   //   sys_getpid needs to return a valid PID for this process.
+  // (Done!)
 #else
   /* for now, this is just a stub that always returns a PID of 1 */
   /* you need to fix this to make it work properly */

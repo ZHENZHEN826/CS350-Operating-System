@@ -193,7 +193,7 @@ enter_forked_process(void *tf, unsigned long data2)
   struct trapframe *ttf = tf;
   struct trapframe t;
   t = *ttf;
-  //kfree(ttf);
+  kfree(ttf);
   // change child's trapframe values before going back to userspace from fork
   // 	a3 for result success or fail code
   // 	v0 for return value or error code
