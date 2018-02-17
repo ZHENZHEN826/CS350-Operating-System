@@ -234,8 +234,8 @@ proc_bootstrap(void)
   processArrayLock = lock_create("processArray");
 
   unsigned int pid;
-  //array_add(processArray, kproc, &(pid));
-  //kproc->pid=pid;
+  array_add(processArray, kproc, &(pid));
+  kproc->pid=pid;
   array_add(processArray, NULL, &(pid));
 	
 #endif
