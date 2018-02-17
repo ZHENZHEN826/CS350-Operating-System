@@ -241,7 +241,7 @@ proc_bootstrap(void)
 #endif
 
 #ifdef UW
-  proc_count = 1;
+  proc_count = 0;
   
   proc_count_mutex = sem_create("proc_count_mutex",1);
   if (proc_count_mutex == NULL) {
