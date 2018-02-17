@@ -33,7 +33,7 @@ void sys__exit(int exitcode) {
   } 
 
   // For parents, find children,
-  for (unsigned int i = 1; i <= array_num(processArray); i++){
+  for (unsigned int i = 0; i < array_num(processArray); i++){
     struct proc *pidProc = array_get(processArray, i);
     if (p->pid == pidProc->parent){
       // if any live children, detach the children and parent relationship

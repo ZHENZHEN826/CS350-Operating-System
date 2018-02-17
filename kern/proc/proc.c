@@ -305,8 +305,8 @@ proc_create_runprogram(const char *name)
     lock_release(pidCountLock);
 
     lock_acquire(processArrayLock);
-      // unsigned int pid = pidCount;
-      array_add(processArray, proc, &(proc->pid));
+      unsigned int pid = proc->pid;
+      array_add(processArray, proc, &(pid));
     lock_release(processArrayLock);
 #endif
 
