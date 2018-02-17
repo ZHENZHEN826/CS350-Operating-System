@@ -33,14 +33,19 @@ void sys__exit(int exitcode) {
   } 
 
   // For parents, find children,
-  for (unsigned int i = 0; i < array_num(processArray); i++){
+  unsigned int n = array_num(processArray);
+  for (unsigned int i = 0; i < n; i++){
     struct proc *pidProc = array_get(processArray, i);
+    if (pidProc == NULL) {
+        continue;
+    }
     if (p->pid == pidProc->parent){
+      
       // if any live children, detach the children and parent relationship
       //if (pidProc->exitStatus != -1){
       pidProc->parent = -1;
       //}
-	   // release children's exit lock, so that they can exit
+	    // release children's exit lock, so that they can exit
       lock_release(pidProc->exitLock); 
     }
   }

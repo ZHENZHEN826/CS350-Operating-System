@@ -185,9 +185,11 @@ proc_destroy(struct proc *proc)
 #if OPT_A2
 	// set the entry to NULL in process table
 	// cannot remove because sys__exit need to loop proc table by PID
-	lock_acquire(processArrayLock); 
-	  array_set(processArray, proc->pid, NULL);
-	lock_release(processArrayLock);
+	//lock_acquire(processArrayLock); 
+	if(proc->pid > 0){
+		array_set(processArray, proc->pid, NULL);
+	}
+	//lock_release(processArrayLock);
 
 	cv_destroy(proc->waitExit);
 	lock_destroy(proc->waitExitLock);
@@ -226,9 +228,16 @@ proc_bootstrap(void)
   // Initialize process table, PID
   pidCountLock = lock_create("pidCount");
   pidCount = 0;
+
   processArray = array_create();
   array_init(processArray);
   processArrayLock = lock_create("processArray");
+
+  unsigned int pid;
+  array_add(process_table, kproc, &(pid));
+  kproc->pid=pid;
+  array_add(process_table, NULL, &(pid));
+	
 #endif
 
 #ifdef UW
@@ -299,14 +308,17 @@ proc_create_runprogram(const char *name)
 
 	  
 #if OPT_A2
-	lock_acquire(pidCountLock);
-	  pidCount += 1;
-      proc->pid = pidCount;
-    lock_release(pidCountLock);
+	//lock_acquire(pidCountLock);
+	//  pidCount += 1;
+    //  proc->pid = pidCount;
+    //lock_release(pidCountLock);
 
     lock_acquire(processArrayLock);
-      unsigned int pid = proc->pid;
+      unsigned int pid;
+
       array_add(processArray, proc, &(pid));
+      proc->pid=pid;
+
     lock_release(processArrayLock);
 #endif
 
