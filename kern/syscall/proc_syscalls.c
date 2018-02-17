@@ -29,26 +29,26 @@ void sys__exit(int exitcode) {
 
   // For child, if parents live, wake them up
   if (p->parent != -1){
-    cv_signal(p->waitExit, p->waitExitLock);
-  } else {
-    // Else, check children,
-// PROBLEM HERE. 
-    for (unsigned int i = __PID_MIN; i < (__PID_MIN + array_num(processArray)); i++){
-      struct proc *pidProc = array_get(processArray, i);
-      if (p->pid == pidProc->parent){
-        // if any live children, detach the children and parent relationship
-        if (pidProc->exitStatus != -1){
-          pidProc->parent = -1;
-        }
-	// release children's exit lock, so that they can exit
-        lock_release(pidProc->exitLock); 
-      }
-    }
-    // For child, if my parent is died, fully delete myself, b/c no parent can call waitpid
-    // For parent, fully delete myself
-    // Meaning, if no living parent, fully delete myself
-    // proc_destroy(p);
+    cv_broadcast(p->waitExit, p->waitExitLock);
   } 
+
+  // For parents, find children,
+  for (unsigned int i = 1; i <= array_num(processArray); i++){
+    struct proc *pidProc = array_get(processArray, i);
+    if (p->pid == pidProc->parent){
+      // if any live children, detach the children and parent relationship
+      //if (pidProc->exitStatus != -1){
+      pidProc->parent = -1;
+      //}
+	   // release children's exit lock, so that they can exit
+      lock_release(pidProc->exitLock); 
+    }
+  }
+  // For child, if my parent is died, fully delete myself, b/c no parent can call waitpid
+  // For parent, fully delete myself
+  // Meaning, if no living parent, fully delete themself
+  // proc_destroy(p);
+  
   
 #else
   /* for now, just include this to keep the compiler from complaining about
@@ -100,7 +100,6 @@ sys_getpid(pid_t *retval)
   // Need to perform process assignment even without/before any fork calls.
   //   The first user process might call getpid before creating any children. 
   //   sys_getpid needs to return a valid PID for this process.
-  return kproc->pid;
 #else
   /* for now, this is just a stub that always returns a PID of 1 */
   /* you need to fix this to make it work properly */
@@ -119,7 +118,10 @@ sys_waitpid(pid_t pid,
 {
   int exitstatus;
   int result;
-
+  
+  if (options != 0) {
+    return(EINVAL);
+  }
 #if OPT_A2
   struct proc *p = curproc;
   struct proc *pidProc = array_get(processArray, pid);
@@ -135,9 +137,7 @@ sys_waitpid(pid_t pid,
   if(status == NULL){
     return EFAULT;
   }
-  if (options != 0) {
-    return(EINVAL);
-  }
+  
   
   // while the child hasn't exited, go to sleep.
   // cv on the child process
@@ -149,9 +149,8 @@ sys_waitpid(pid_t pid,
   exitstatus = pidProc->exitStatus;
   lock_release(pidProc->waitExitLock);
 
-  // fire this child?
-  //proc_destroy(pidProc);
-  //array_remove(processArray, i);
+  // Parent get the child's exit code, allow the child to exit
+  lock_release(pidProc->exitLock);
 
 #else
   /* this is just a stub implementation that always reports an
@@ -162,9 +161,7 @@ sys_waitpid(pid_t pid,
 
      Fix this!
   */
-  if (options != 0) {
-    return(EINVAL);
-  }
+
   /* for now, just pretend the exitstatus is 0 */
   exitstatus = 0;
 #endif 
