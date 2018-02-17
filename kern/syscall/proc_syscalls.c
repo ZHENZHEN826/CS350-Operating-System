@@ -155,7 +155,7 @@ sys_waitpid(pid_t pid,
   lock_release(pidProc->waitExitLock);
 
   // Parent get the child's exit code, allow the child to exit
-  lock_release(pidProc->exitLock);
+  //lock_release(pidProc->exitLock);
 
 #else
   /* this is just a stub implementation that always reports an
