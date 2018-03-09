@@ -184,70 +184,143 @@ sys_waitpid(pid_t pid,
 
 int
 sys_fork(pid_t *retval, struct trapframe *tf) { 
-    //There are already too many processes on the system.
-    if (array_num(processArray) >= __PID_MAX) {
-      // EMPROC - The current user already has too many processes.
-      // Since there is only one user, EMPROC and ENPROC are the same.
-      return ENPROC;
-    }
+  //There are already too many processes on the system.
+  if (array_num(processArray) >= __PID_MAX) {
+    // EMPROC - The current user already has too many processes.
+    // Since there is only one user, EMPROC and ENPROC are the same.
+    return ENPROC;
+  }
 
-    /* Create process structure for child process */
-    struct proc *childProc = proc_create_runprogram("childProc");
-    if (childProc == NULL) {
-        return ENOMEM;
-    }
-    lock_acquire(childProc->exitLock);
-    
-    /* Create and copy address space */
-    struct addrspace *oldas = curproc->p_addrspace;
-    struct addrspace *newas;
-    // as_copy: creates a new address spaces, and copies 
-    // the pages from the old address space to the new one
-    int as_copy_status = as_copy(oldas, &newas);
-    // if as_copy return an error
-    if (as_copy_status != 0){
-        kfree(oldas);
-        kfree(newas);
-        proc_destroy(childProc);
-        return as_copy_status;
-    }
-
-    // associate address space with the child process
-    spinlock_acquire(&childProc->p_lock);
-    childProc->p_addrspace = newas;
-    spinlock_release(&childProc->p_lock);
-
-    //DEBUG(DB_LOCORE,"Fork118: oldas(%d) newas(%d)\n",oldas->as_vbase1,newas->as_vbase1);
-    DEBUG(DB_LOCORE,"Fork202: childProc->pid = %d \n", childProc->pid);
-    DEBUG(DB_LOCORE,"Fork202: curProc->pid = %d \n", curproc->pid);
-    /* Create the parent/child relationship */
-    // current process's pid
-    childProc->parent = curproc->pid;
-
-    /* Create thread for child process */
-
-    // Can we just pass the parent's trapframe pointer to thread_fork?
-    // No, parent process may exit before child thread created, parent's trapframe may already be deleted.
-    // Solution: Copy parents trapframe on the heap 
-    // and pass a pointer to the copy into the entrypoint function.
-    struct trapframe *childTf = kmalloc(sizeof(struct trapframe));
-    if(childTf == NULL){
-      proc_destroy(childProc);
+  /* Create process structure for child process */
+  struct proc *childProc = proc_create_runprogram("childProc");
+  if (childProc == NULL) {
       return ENOMEM;
-    }
-    *childTf = *tf;
-    // create a new thread
-    int forkResult = thread_fork("childProc", childProc, enter_forked_process, childTf, 0);
-    if(forkResult != 0){
+  }
+  lock_acquire(childProc->exitLock);
+  
+  /* Create and copy address space */
+  struct addrspace *oldas = curproc->p_addrspace;
+  struct addrspace *newas;
+  // as_copy: creates a new address spaces, and copies 
+  // the pages from the old address space to the new one
+  int as_copy_status = as_copy(oldas, &newas);
+  // if as_copy return an error
+  if (as_copy_status != 0){
       kfree(oldas);
       kfree(newas);
-      kfree(childTf);
       proc_destroy(childProc);
-      return forkResult;
-    }
+      return as_copy_status;
+  }
 
-    *retval = childProc->pid;
-    return 0;
+  // associate address space with the child process
+  spinlock_acquire(&childProc->p_lock);
+  childProc->p_addrspace = newas;
+  spinlock_release(&childProc->p_lock);
+
+  //DEBUG(DB_LOCORE,"Fork118: oldas(%d) newas(%d)\n",oldas->as_vbase1,newas->as_vbase1);
+  DEBUG(DB_LOCORE,"Fork202: childProc->pid = %d \n", childProc->pid);
+  DEBUG(DB_LOCORE,"Fork202: curProc->pid = %d \n", curproc->pid);
+  /* Create the parent/child relationship */
+  // current process's pid
+  childProc->parent = curproc->pid;
+
+  /* Create thread for child process */
+
+  // Can we just pass the parent's trapframe pointer to thread_fork?
+  // No, parent process may exit before child thread created, parent's trapframe may already be deleted.
+  // Solution: Copy parents trapframe on the heap 
+  // and pass a pointer to the copy into the entrypoint function.
+  struct trapframe *childTf = kmalloc(sizeof(struct trapframe));
+  if(childTf == NULL){
+    proc_destroy(childProc);
+    return ENOMEM;
+  }
+  *childTf = *tf;
+  // create a new thread
+  int forkResult = thread_fork("childProc", childProc, enter_forked_process, childTf, 0);
+  if(forkResult != 0){
+    kfree(oldas);
+    kfree(newas);
+    kfree(childTf);
+    proc_destroy(childProc);
+    return forkResult;
+  }
+
+  *retval = childProc->pid;
+  return 0;
+}
+#endif
+
+
+#if OPT_A2
+
+int
+sys_execv(char *progname) { 
+  /* Count the number of arguments and copy them into the kernel */
+
+  /* Copy the program path into the kernel */
+
+  struct addrspace *as;
+  struct vnode *v;
+  vaddr_t entrypoint, stackptr;
+  int result;
+
+  /* Open the file. */
+  result = vfs_open(progname, O_RDONLY, 0, &v);
+  if (result) {
+    return result;
+  }
+
+  /* We should be a new process. */
+  KASSERT(curproc_getas() == NULL);
+
+  /* Create a new address space. */
+  as = as_create();
+  if (as ==NULL) {
+    vfs_close(v);
+    return ENOMEM;
+  }
+
+  /* Switch to it and activate it. */
+  curproc_setas(as);
+  as_activate();
+
+  /* Load the executable. */
+  result = load_elf(v, &entrypoint);
+  if (result) {
+    /* p_addrspace will go away when curproc is destroyed */
+    vfs_close(v);
+    return result;
+  }
+
+  /* Need to copy the arguments into the new address space. 
+  Consider copying the arguments (both the array and the strings) 
+  onto the user stack as part of as_define_stack. */
+  
+
+
+
+  /* Done with the file now. */
+  vfs_close(v);
+
+  /* Define the user stack in the address space */
+  result = as_define_stack(as, &stackptr);
+  if (result) {
+    /* p_addrspace will go away when curproc is destroyed */
+    return result;
+  }
+
+  /* Delete old address space */
+  as_destroy(as);
+  
+  /* Warp to user mode. */
+  enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
+        stackptr, entrypoint);
+  
+  /* enter_new_process does not return. */
+  panic("enter_new_process returned\n");
+  return EINVAL;
+
 }
 #endif
 
