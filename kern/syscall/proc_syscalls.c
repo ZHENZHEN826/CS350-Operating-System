@@ -259,14 +259,30 @@ sys_fork(pid_t *retval, struct trapframe *tf) {
 int
 sys_execv(const_userptr_t progname, userptr_t args) { 
   /* Count the number of arguments and copy them into the kernel */
-  //int argc = strlen(args[0]); 
-  (void) args;
+  int i = 0;            // Number of arguments
+  size_t argsSize = 0;  // Total size of all arguments
+  while (((char**)args)[i] != NULL){
+    argsSize += strlen(((char**)args)[i]) + 1;
+    i ++;  
+  }
+  argsSize += 1;        // For NULL
+
+  // Create the argv array in the user program's address space
+  char **argsArray = kmalloc(sizeof(char) * argsSize);
+  argsArray[i] = NULL;
+  for (int j = 0; j < argsCount; j++ ){
+    size_t argLength = strlen(((char**)args)[j]) + 1;
+    argsArray[j] = kmalloc(sizeof(char) * argLength);
+    // Copy arguments to the kernel
+    copyinstr((const_userptr_t)((char**)args)[j], argsArray[j], argLength, &argLength); 
+  }
+  
   /* Copy the program path into the kernel */
   size_t progLength = strlen((char *)progname) + 1;
   char *progPath = kmalloc(sizeof(char) * progLength);
   copyinstr(progname, progPath, progLength, &progLength); 
 
-  struct addrspace *as;
+  struct addrspace *as; // New address space
   struct vnode *v;
   vaddr_t entrypoint, stackptr;
   int result;
@@ -298,14 +314,7 @@ sys_execv(const_userptr_t progname, userptr_t args) {
     vfs_close(v);
     return result;
   }
-
-  /* Need to copy the arguments into the new address space. 
-  Consider copying the arguments (both the array and the strings) 
-  onto the user stack as part of as_define_stack. */
   
-
-
-
   /* Done with the file now. */
   vfs_close(v);
 
@@ -316,13 +325,33 @@ sys_execv(const_userptr_t progname, userptr_t args) {
     return result;
   }
 
+  /* Need to copy the arguments into the new address space. 
+  Consider copying the arguments (both the array and the strings) 
+  onto the user stack as part of as_define_stack. */
+
+  // Copy each arg string and then place them on the new stack of newly created user space. 
+  vaddr_t argsPointer[i];
+  argsPointer[i] = 0;
+  for (int j = i - 1; j >= 0; j--){
+    size_t argLength = strlen(argsArray[j]) + 1;
+    stackptr -= argLength;
+    argsPointer[j] = stackptr
+    copyoutstr(argsArray[i], (userptr_t)stackptr, argLength, &argLength);
+  }
+  // Place pointers on the stack which point to these arg strings.
+  stackptr -= stackptr % 4;
+  for(int j = i; j >= 0; j--){
+    stackptr -= ROUNDUP(sizeof(vaddr_t),4);
+    copyout(&argsPointer[j],(userptr_t)stackptr,sizeof(vaddr_t));
+  }
+
   //kfree(progPath);
   
   /* Delete old address space */
   as_destroy(oldas);
   
   /* Warp to user mode. */
-  enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
+  enter_new_process(i /*argc*/, (userptr_t)stackptr /*userspace addr of argv*/,
         stackptr, entrypoint);
   
   /* enter_new_process does not return. */
