@@ -263,7 +263,7 @@ sys_execv(const_userptr_t progname, userptr_t args) {
   (void) args;
   /* Copy the program path into the kernel */
   size_t progLength = strlen((char *)progname) + 1;
-  char *progPath = kmalloc(sizeof(char)*progLength);
+  char *progPath = kmalloc(sizeof(char) * progLength);
   copyinstr(progname, progPath, progLength, &progLength); 
 
   struct addrspace *as;
@@ -288,7 +288,7 @@ sys_execv(const_userptr_t progname, userptr_t args) {
   }
 
   /* Switch to it and activate it. */
-  curproc_setas(as);
+  struct addrspace *oldas = curproc_setas(as);
   as_activate();
 
   /* Load the executable. */
@@ -319,7 +319,7 @@ sys_execv(const_userptr_t progname, userptr_t args) {
   //kfree(progPath);
   
   /* Delete old address space */
-  as_destroy(as);
+  as_destroy(oldas);
   
   /* Warp to user mode. */
   enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
