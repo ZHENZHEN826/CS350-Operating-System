@@ -257,11 +257,14 @@ sys_fork(pid_t *retval, struct trapframe *tf) {
 #if OPT_A2
 
 int
-sys_execv(userptr_t progname, userptr_t args) { 
+sys_execv(const_userptr_t progname, userptr_t args) { 
   /* Count the number of arguments and copy them into the kernel */
   //int argc = strlen(args[0]); 
   (void) args;
   /* Copy the program path into the kernel */
+  size_t progLength = strlen((char *)progname) + 1;
+  char *progPath = kmalloc(sizeof(char)*progLength);
+  copyinstr(progname, progPath, progLength, &progLength); 
 
   struct addrspace *as;
   struct vnode *v;
@@ -269,7 +272,7 @@ sys_execv(userptr_t progname, userptr_t args) {
   int result;
 
   /* Open the file. */
-  result = vfs_open((char *)progname, O_RDONLY, 0, &v);
+  result = vfs_open(progPath, O_RDONLY, 0, &v);
   if (result) {
     return result;
   }
@@ -313,6 +316,8 @@ sys_execv(userptr_t progname, userptr_t args) {
     return result;
   }
 
+  //kfree(progPath);
+  
   /* Delete old address space */
   as_destroy(as);
   
