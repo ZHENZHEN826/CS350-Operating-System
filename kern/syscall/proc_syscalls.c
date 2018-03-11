@@ -12,6 +12,8 @@
 #include <synch.h>
 #include <limits.h>
 #include <mips/trapframe.h>
+#include <vfs.h>
+#include <kern/fcntl.h>
 #include "opt-A2.h"
 
   /* this implementation of sys__exit does not do anything with the exit code */
@@ -255,9 +257,10 @@ sys_fork(pid_t *retval, struct trapframe *tf) {
 #if OPT_A2
 
 int
-sys_execv(char *progname) { 
+sys_execv(userptr_t progname, userptr_t args) { 
   /* Count the number of arguments and copy them into the kernel */
-
+  //int argc = strlen(args[0]); 
+  (void) args;
   /* Copy the program path into the kernel */
 
   struct addrspace *as;
@@ -266,13 +269,13 @@ sys_execv(char *progname) {
   int result;
 
   /* Open the file. */
-  result = vfs_open(progname, O_RDONLY, 0, &v);
+  result = vfs_open((char *)progname, O_RDONLY, 0, &v);
   if (result) {
     return result;
   }
 
   /* We should be a new process. */
-  KASSERT(curproc_getas() == NULL);
+  // KASSERT(curproc_getas() == NULL);
 
   /* Create a new address space. */
   as = as_create();
