@@ -277,11 +277,11 @@ sys_execv(const_userptr_t progname, userptr_t args) {
   }
  
   for (int j=0; j<=i; j++) {
-	const char *tmp = argsArray[j];
-	if (tmp == NULL) {
-		tmp = "[NULL]";
-	}
-	 DEBUG(DB_LOCORE,"argsArray[%d] -> %s\n", j, tmp);
+    const char *tmp = argsArray[j];
+    if (tmp == NULL) {
+      tmp = "[NULL]";
+    }
+    DEBUG(DB_LOCORE,"argsArray[%d] -> %s\n", j, tmp);
   }
 
  
@@ -335,10 +335,10 @@ sys_execv(const_userptr_t progname, userptr_t args) {
 
   /* Need to copy the arguments into the new address space. 
   Consider copying the arguments (both the array and the strings) 
-  onto the user stack as part of as_define_stack. */
+  onto the user stack (as part of as_define_stack.) */
 
   // Copy each arg string and then place them on the new stack of newly created user space. 
-  vaddr_t argsPointer[i+1];
+  vaddr_t argsPointer[i];
   argsPointer[i] = 0;
   for (int j = i - 1; j >= 0; j--){
     size_t argLength = strlen(argsArray[j]) + 1;

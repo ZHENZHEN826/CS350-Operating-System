@@ -44,6 +44,7 @@
 #include <vfs.h>
 #include <syscall.h>
 #include <test.h>
+#include <copyinout.h>
 
 /*
  * Load program "progname" and start running it in usermode.
@@ -98,7 +99,7 @@ runprogram(char *progname, unsigned long nargs, char **args)
 	}
 
 #if OPT_A2
-    vaddr_t argsPointer[nargs+1];
+        vaddr_t argsPointer[nargs];
 	argsPointer[nargs] = 0;
 	for (int j = nargs - 1; j >= 0; j--){
 		size_t argLength = strlen(args[j]) + 1;
