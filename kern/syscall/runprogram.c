@@ -52,7 +52,7 @@
  * Calls vfs_open on progname and thus may destroy it.
  */
 int
-runprogram(char *progname)
+runprogram(char *progname, unsigned long nargs, char **args)
 {
 	struct addrspace *as;
 	struct vnode *v;
@@ -97,9 +97,34 @@ runprogram(char *progname)
 		return result;
 	}
 
+#if OPT_A2
+    vaddr_t argsPointer[nargs+1];
+	argsPointer[nargs] = 0;
+	for (int j = nargs - 1; j >= 0; j--){
+		size_t argLength = strlen(args[j]) + 1;
+		stackptr -= argLength;
+		argsPointer[j] = stackptr;
+		copyoutstr(args[j], (userptr_t)stackptr, argLength, &argLength);
+		DEBUG(DB_LOCORE,"stackptr[%d] -> %p\n", j, (userptr_t)stackptr);
+	}
+	// Place pointers on the stack which point to these arg strings.
+	stackptr -= stackptr % 4;
+	for(int j = nargs; j >= 0; j--){
+		stackptr -= ROUNDUP(sizeof(vaddr_t),4);
+		copyout(&argsPointer[j],(userptr_t)stackptr,sizeof(vaddr_t));
+		DEBUG(DB_LOCORE,"stackptr[%d] -> %p\n", j, (userptr_t)stackptr);
+	}
+
+
+	/* Warp to user mode. */
+	enter_new_process(nargs /*argc*/, (userptr_t)stackptr /*userspace addr of argv*/,
+			  stackptr, entrypoint);
+#else
 	/* Warp to user mode. */
 	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
 			  stackptr, entrypoint);
+
+#endif 
 	
 	/* enter_new_process does not return. */
 	panic("enter_new_process returned\n");

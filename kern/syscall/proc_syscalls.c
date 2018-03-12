@@ -344,7 +344,7 @@ sys_execv(const_userptr_t progname, userptr_t args) {
     size_t argLength = strlen(argsArray[j]) + 1;
     stackptr -= argLength;
     argsPointer[j] = stackptr;
-    copyoutstr(argsArray[i], (userptr_t)stackptr, argLength, &argLength);
+    copyoutstr(argsArray[j], (userptr_t)stackptr, argLength, &argLength);
     DEBUG(DB_LOCORE,"stackptr[%d] -> %p\n", j, (userptr_t)stackptr);
   }
   // Place pointers on the stack which point to these arg strings.
