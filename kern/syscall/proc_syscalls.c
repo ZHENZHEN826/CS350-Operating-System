@@ -265,18 +265,26 @@ sys_execv(const_userptr_t progname, userptr_t args) {
     argsSize += strlen(((char**)args)[i]) + 1;
     i ++;  
   }
-  argsSize += 1;        // For NULL
 
   // Create the argv array in the user program's address space
-  char **argsArray = kmalloc(sizeof(char) * argsSize);
+  char **argsArray = kmalloc(sizeof(char *) * argsSize + 1);
   argsArray[i] = NULL;
-  for (int j = 0; j < argsCount; j++ ){
+  for (int j = 0; j < i; j++ ){
     size_t argLength = strlen(((char**)args)[j]) + 1;
     argsArray[j] = kmalloc(sizeof(char) * argLength);
     // Copy arguments to the kernel
-    copyinstr((const_userptr_t)((char**)args)[j], argsArray[j], argLength, &argLength); 
+    copyinstr((const_userptr_t)(((char**)args)[j]), argsArray[j], argLength, &argLength); 
   }
-  
+ 
+  for (int j=0; j<=i; j++) {
+	const char *tmp = argsArray[j];
+	if (tmp == NULL) {
+		tmp = "[NULL]";
+	}
+	 DEBUG(DB_LOCORE,"argsArray[%d] -> %s\n", j, tmp);
+  }
+
+ 
   /* Copy the program path into the kernel */
   size_t progLength = strlen((char *)progname) + 1;
   char *progPath = kmalloc(sizeof(char) * progLength);
@@ -330,23 +338,29 @@ sys_execv(const_userptr_t progname, userptr_t args) {
   onto the user stack as part of as_define_stack. */
 
   // Copy each arg string and then place them on the new stack of newly created user space. 
-  vaddr_t argsPointer[i];
+  vaddr_t argsPointer[i+1];
   argsPointer[i] = 0;
   for (int j = i - 1; j >= 0; j--){
     size_t argLength = strlen(argsArray[j]) + 1;
     stackptr -= argLength;
-    argsPointer[j] = stackptr
+    argsPointer[j] = stackptr;
     copyoutstr(argsArray[i], (userptr_t)stackptr, argLength, &argLength);
+    DEBUG(DB_LOCORE,"stackptr[%d] -> %p\n", j, (userptr_t)stackptr);
   }
   // Place pointers on the stack which point to these arg strings.
   stackptr -= stackptr % 4;
   for(int j = i; j >= 0; j--){
     stackptr -= ROUNDUP(sizeof(vaddr_t),4);
     copyout(&argsPointer[j],(userptr_t)stackptr,sizeof(vaddr_t));
+    DEBUG(DB_LOCORE,"stackptr[%d] -> %p\n", j, (userptr_t)stackptr);
   }
 
-  //kfree(progPath);
-  
+  kfree(progPath);
+  for (int j = 0; j < i; j++){
+    kfree(argsArray[j]);
+  }
+  kfree(argsArray);
+
   /* Delete old address space */
   as_destroy(oldas);
   
