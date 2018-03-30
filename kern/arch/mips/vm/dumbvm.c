@@ -131,8 +131,9 @@ getppages(unsigned long npages)
 		for (unsigned int j = i; j < i + npages; j++){
 			coremap[j].number = k;
 			k++;
+//kprintf("Get:coremap[j].number %d\n",coremap[j].number);
 		}
-		kprintf("Test!\n");
+//		kprintf("Test!\n");
 	} else {
 		kprintf("out of memory!\n");
 		addr = 0;
@@ -172,9 +173,13 @@ free_kpages(vaddr_t addr)
 			int k = 1;
 			// KASSERT(coremap[i].number == 1);
 			while (coremap[j].number == k){
+//kprintf("free:coremap[j].number %d\n",coremap[j].number);
+//kprintf("free: j: %d   k: %d\n",j,k);
 				coremap[j].number = 0;
 				j++;
 				k++;
+//kprintf("free:coremap[j].number %d\n",coremap[j].number);
+//kprintf("free: j: %d   k: %d\n",j,k);
 			}
 			break;
 		}
@@ -347,13 +352,16 @@ void
 as_destroy(struct addrspace *as)
 {	
 #if OPT_A3
-	if (as==NULL) {
-            return;
-        }
+	//if (as==NULL) {
+        //    return;
+        //}
 
-	free_kpages(as->as_pbase1);
-	free_kpages(as->as_pbase2);
-	free_kpages(as->as_stackpbase);
+	//free_kpages(as->as_pbase1);
+	//free_kpages(as->as_pbase2);
+	//free_kpages(as->as_stackpbase);
+	kfree((void *)PADDR_TO_KVADDR(as->as_pbase1));
+	kfree((void *)PADDR_TO_KVADDR(as->as_pbase2));
+	kfree((void *)PADDR_TO_KVADDR(as->as_stackpbase));
 #endif
 	kfree(as);
 }
