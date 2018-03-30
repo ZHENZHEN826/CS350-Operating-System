@@ -121,6 +121,9 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 
 	switch (faulttype) {
 	    case VM_FAULT_READONLY:
+#if OPT_A3
+			return 1;
+#endif
 		/* We always create pages read-write, so we can't get this */
 		panic("dumbvm: got VM_FAULT_READONLY\n");
 	    case VM_FAULT_READ:
@@ -195,6 +198,10 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 		}
 		ehi = faultaddress;
 		elo = paddr | TLBLO_DIRTY | TLBLO_VALID;
+		// if load_elf has completed and in code segment, Read-Only Text Segment
+		if ((as->loadelfComplete) && (faultaddress >= vbase1 && faultaddress < vtop1)){
+			elo &= ~TLBLO_DIRTY;
+		}
 		DEBUG(DB_VM, "dumbvm: 0x%x -> 0x%x\n", faultaddress, paddr);
 		tlb_write(ehi, elo, i);
 		splx(spl);
@@ -203,6 +210,10 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 #if OPT_A3
 	ehi = faultaddress;
 	elo = paddr | TLBLO_DIRTY | TLBLO_VALID;
+
+	if ((as->loadelfComplete) && (faultaddress >= vbase1 && faultaddress < vtop1)){
+			elo &= ~TLBLO_DIRTY;
+	}
 	tlb_random(ehi, elo);
 	splx(spl);
 	return 0;
@@ -228,7 +239,9 @@ as_create(void)
 	as->as_pbase2 = 0;
 	as->as_npages2 = 0;
 	as->as_stackpbase = 0;
-
+#if OPT_A3
+	as->loadelfComplete = 0;
+#endif
 	return as;
 }
 
