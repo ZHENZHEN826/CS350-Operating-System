@@ -58,7 +58,7 @@ struct coreMap{
 };
 
 struct coreMap* coremap;
-int availableFrames;
+int totalFrames;
 
 void
 vm_bootstrap(void)
@@ -66,9 +66,9 @@ vm_bootstrap(void)
 	
 #if OPT_A3
 	// To get the remaining physical memory in the system.
-	paddr_t *lo;
-	paddr_t *hi;
-	ram_getsize (lo, hi);
+	paddr_t lo;
+	paddr_t hi;
+	ram_getsize (&lo, &hi);
 
 	// number of frames
 	int framesNum = (hi-lo)/PAGE_SIZE;	
@@ -78,7 +78,8 @@ vm_bootstrap(void)
 
 	// Find space for coremap, don't need to manage coremap
 	lo += framesNum*(sizeof(struct coreMap));
-	lo += (lo % PAGE_SIZE); //ROUNDUP(lo, PAGE_SIZE);
+	//lo += (lo % PAGE_SIZE); //ROUNDUP(lo, PAGE_SIZE);
+	lo = ROUNDUP(lo, PAGE_SIZE);
 
 	framesNum = (hi-lo)/PAGE_SIZE;	
 	totalFrames = framesNum;
@@ -104,8 +105,15 @@ getppages(unsigned long npages)
 
 #if OPT_A3
 	bool findSuccess = true;
-	for (int i = 0; i < totalFrames; i++){
-		for (int j = i; j < i + npages; j++){
+	int i = 0;
+	int pageNumber = npages;
+	for (i = 0; i < totalFrames; i++){
+		findSuccess = true;
+		if((i+pageNumber) > totalFrames){
+			findSuccess = false;
+			break;
+		}	 
+		for (unsigned int j = i; j < i + npages; j++){
 			if (coremap[j].number != 0){
 				findSuccess = false;
 				break;
@@ -120,13 +128,16 @@ getppages(unsigned long npages)
 	} else if (findSuccess){
 		addr= coremap[i].addr;
 		int k = 1;
-		for (int j = i; j < i + npages; j++){
+		for (unsigned int j = i; j < i + npages; j++){
 			coremap[j].number = k;
 			k++;
 		}
+		kprintf("Test!\n");
 	} else {
 		kprintf("out of memory!\n");
-		return ENOMEM;
+		addr = 0;
+		//spinlock_release(&stealmem_lock);
+		//return ENOMEM;
 	}
 
 #else
@@ -156,12 +167,12 @@ free_kpages(vaddr_t addr)
 	spinlock_acquire(&stealmem_lock);
 	for (int i = 0; i < totalFrames; i++){
 
-		if(coremap[i].addr == addr){
+		if(PADDR_TO_KVADDR(coremap[i].addr) == addr){
 			int j = i;
 			int k = 1;
 			// KASSERT(coremap[i].number == 1);
 			while (coremap[j].number == k){
-				coremap[j].number == 0;
+				coremap[j].number = 0;
 				j++;
 				k++;
 			}
@@ -336,9 +347,13 @@ void
 as_destroy(struct addrspace *as)
 {	
 #if OPT_A3
-	kfree(as->as_pbase1);
-	kfree(as->as_pbase2);
-	kfree(as->as_stackpbase);
+	if (as==NULL) {
+            return;
+        }
+
+	free_kpages(as->as_pbase1);
+	free_kpages(as->as_pbase2);
+	free_kpages(as->as_stackpbase);
 #endif
 	kfree(as);
 }
