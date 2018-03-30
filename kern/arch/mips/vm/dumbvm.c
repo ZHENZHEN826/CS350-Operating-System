@@ -200,9 +200,10 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 		splx(spl);
 		return 0;
 	}
-#if OPT A3
+#if OPT_A3
+	ehi = faultaddress;
 	elo = paddr | TLBLO_DIRTY | TLBLO_VALID;
-	tlb_random(ehi, elo)
+	tlb_random(ehi, elo);
 	splx(spl);
 	return 0;
 #else
