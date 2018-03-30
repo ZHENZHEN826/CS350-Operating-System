@@ -39,7 +39,7 @@
 #include <vm.h>
 #include <mainbus.h>
 #include <syscall.h>
-
+#include "opt-A3.h"
 
 /* in exception.S */
 extern void asm_usermode(struct trapframe *tf);
