@@ -52,10 +52,46 @@
  */
 static struct spinlock stealmem_lock = SPINLOCK_INITIALIZER;
 
+struct coreMap{
+	paddr_t addr;
+	int number;
+};
+
+struct coreMap* coremap;
+int availableFrames;
+
 void
 vm_bootstrap(void)
 {
+	
+#if OPT_A3
+	// To get the remaining physical memory in the system.
+	paddr_t *lo;
+	paddr_t *hi;
+	ram_getsize (lo, hi);
+
+	// number of frames
+	int framesNum = (hi-lo)/PAGE_SIZE;	
+	// totalFrames = framesNum;
+
+	coremap = (struct coreMap *) PADDR_TO_KVADDR(lo);
+
+	// Find space for coremap, don't need to manage coremap
+	lo += framesNum*(sizeof(struct coreMap));
+	lo += (lo % PAGE_SIZE); //ROUNDUP(lo, PAGE_SIZE);
+
+	framesNum = (hi-lo)/PAGE_SIZE;	
+	totalFrames = framesNum;
+
+	for (int i = 0; i < totalFrames; i++) {
+		coremap[i].addr = lo + i*PAGE_SIZE;
+		coremap[i].number = 0;
+	}
+	
+
+#else
 	/* Do nothing. */
+#endif
 }
 
 static
@@ -66,8 +102,37 @@ getppages(unsigned long npages)
 
 	spinlock_acquire(&stealmem_lock);
 
+#if OPT_A3
+	bool findSuccess = true;
+	for (int i = 0; i < totalFrames; i++){
+		for (int j = i; j < i + npages; j++){
+			if (coremap[j].number != 0){
+				findSuccess = false;
+				break;
+			}
+		}
+		if (findSuccess){
+			break;
+		}
+	}
+	if (totalFrames == 0){
+		addr = ram_stealmem(npages);
+	} else if (findSuccess){
+		addr= coremap[i].addr;
+		int k = 1;
+		for (int j = i; j < i + npages; j++){
+			coremap[j].number = k;
+			k++;
+		}
+	} else {
+		kprintf("out of memory!\n");
+		return ENOMEM;
+	}
+
+#else
 	addr = ram_stealmem(npages);
-	
+#endif
+
 	spinlock_release(&stealmem_lock);
 	return addr;
 }
@@ -87,9 +152,29 @@ alloc_kpages(int npages)
 void 
 free_kpages(vaddr_t addr)
 {
+#if OPT_A3
+	spinlock_acquire(&stealmem_lock);
+	for (int i = 0; i < totalFrames; i++){
+
+		if(coremap[i].addr == addr){
+			int j = i;
+			int k = 1;
+			// KASSERT(coremap[i].number == 1);
+			while (coremap[j].number == k){
+				coremap[j].number == 0;
+				j++;
+				k++;
+			}
+			break;
+		}
+	}
+
+	spinlock_release(&stealmem_lock);
+#else
 	/* nothing - leak the memory. */
 
 	(void)addr;
+#endif
 }
 
 void
@@ -249,7 +334,12 @@ as_create(void)
 
 void
 as_destroy(struct addrspace *as)
-{
+{	
+#if OPT_A3
+	kfree(as->as_pbase1);
+	kfree(as->as_pbase2);
+	kfree(as->as_stackpbase);
+#endif
 	kfree(as);
 }
 
